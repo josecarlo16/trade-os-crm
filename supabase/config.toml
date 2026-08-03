@@ -1,0 +1,105 @@
+project_id = "xvsgdzwadxbwpevdezbp"
+
+[functions.admin-password-reset]
+verify_jwt = false
+
+[functions.decode-equipment]
+verify_jwt = false
+
+[functions.search-documentation]
+verify_jwt = false
+
+[functions.generate-sitemap]
+verify_jwt = false
+
+[functions.send-estimator-notification]
+verify_jwt = false
+
+[functions.save-abandoned-cart]
+verify_jwt = false
+
+[functions.google-calendar-sync]
+verify_jwt = false
+
+[functions.ai-assistant]
+verify_jwt = false
+
+
+[functions.workedge-sync]
+verify_jwt = false
+
+[functions.workedge-webhook]
+verify_jwt = false
+
+[functions.assistant-briefing]
+verify_jwt = false
+
+[functions.text-to-speech]
+verify_jwt = false
+
+[functions.create-invoice-payment]
+verify_jwt = false
+
+[functions.otto-ai]
+verify_jwt = false
+
+[functions.harold-api]
+verify_jwt = false
+
+[functions.bach-mcp-server]
+verify_jwt = false
+
+[functions.global-search]
+verify_jwt = false
+
+[functions.regenerate-sitemap]
+verify_jwt = false
+
+[functions.send-crm-email]
+verify_jwt = false
+
+[functions.sync-gmail-replies]
+verify_jwt = false
+
+[functions.generate-email-draft]
+verify_jwt = false
+
+[functions.sync-gsc-index-status]
+verify_jwt = false
+
+[functions.sync-gsc-performance]
+verify_jwt = false
+
+[functions.upsert-equipment-page]
+verify_jwt = false
+
+[functions.backfill-equipment-install-counts]
+verify_jwt = false
+
+[functions.social-generate]
+verify_jwt = false
+
+[functions.social-suggest-ideas]
+verify_jwt = false
+
+[functions.social-weekly-ideas]
+verify_jwt = false
+
+[functions.social-publish]
+verify_jwt = false
+
+[functions.social-connection-check]
+verify_jwt = false
+
+[functions.social-scheduled-publish]
+verify_jwt = false
+
+[functions.trigger-deploy]
+verify_jwt = true
+
+[functions.verify-live-pages]
+verify_jwt = false
+
+
+
+

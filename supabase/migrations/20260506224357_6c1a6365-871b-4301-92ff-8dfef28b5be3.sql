@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Authenticated users can view project media" ON public.workedge_project_media;

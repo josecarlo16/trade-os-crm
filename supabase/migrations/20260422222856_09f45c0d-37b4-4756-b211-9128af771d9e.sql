@@ -1,0 +1,1 @@
+UPDATE public.page_seo SET index_status = 'pending' WHERE index_status IN ('Pending', 'indexable');

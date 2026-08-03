@@ -1,0 +1,1 @@
+ALTER TABLE public.crm_jobs ALTER COLUMN payment_status SET DEFAULT 'no_charge_yet';

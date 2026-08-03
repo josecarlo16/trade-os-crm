@@ -1,0 +1,1 @@
+ALTER TABLE public.crm_customers ADD COLUMN billing_address_line2 TEXT DEFAULT NULL;

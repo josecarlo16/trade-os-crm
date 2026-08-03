@@ -1,0 +1,1 @@
+ALTER TABLE public.crm_social_ideas ADD COLUMN IF NOT EXISTS format text;

@@ -1,0 +1,2 @@
+ALTER TABLE public.crm_team_members DROP CONSTRAINT crm_team_members_role_check;
+ALTER TABLE public.crm_team_members ADD CONSTRAINT crm_team_members_role_check CHECK (role = ANY (ARRAY['manager'::text, 'sales'::text, 'technician'::text, 'apprentice'::text, 'helper'::text]));

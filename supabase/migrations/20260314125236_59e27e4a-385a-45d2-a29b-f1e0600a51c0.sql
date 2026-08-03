@@ -1,0 +1,1 @@
+ALTER TABLE public.individual_equipment_pricing ALTER COLUMN size DROP NOT NULL, ALTER COLUMN size SET DEFAULT '';

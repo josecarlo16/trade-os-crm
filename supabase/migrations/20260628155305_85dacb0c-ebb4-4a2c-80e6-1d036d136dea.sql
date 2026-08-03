@@ -1,0 +1,5 @@
+
+ALTER TABLE public.crm_suppliers
+  ALTER COLUMN company_id SET DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;
+ALTER TABLE public.material_requests
+  ALTER COLUMN company_id SET DEFAULT '00000000-0000-0000-0000-000000000000'::uuid;

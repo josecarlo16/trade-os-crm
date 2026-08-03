@@ -1,0 +1,1 @@
+DELETE FROM public.seo_location_pages WHERE url_slug='/test-page-zzz/'; DELETE FROM public.page_seo WHERE page_path='/test-page-zzz/';

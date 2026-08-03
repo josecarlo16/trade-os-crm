@@ -1,0 +1,1 @@
+ALTER TABLE public.estimates ADD COLUMN workedge_project_id TEXT;

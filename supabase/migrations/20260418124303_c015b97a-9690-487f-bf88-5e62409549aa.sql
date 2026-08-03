@@ -1,0 +1,1 @@
+UPDATE public.page_seo SET schema_applied = true WHERE schema_applied IS DISTINCT FROM true;

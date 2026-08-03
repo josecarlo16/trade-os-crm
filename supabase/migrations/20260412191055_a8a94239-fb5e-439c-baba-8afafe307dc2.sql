@@ -1,0 +1,1 @@
+UPDATE blog_posts SET featured_image = 'https://xvsgdzwadxbwpevdezbp.supabase.co/storage/v1/object/public/blog_images/dallas-uhi-heatmap.png', featured_image_alt = 'Dallas Urban Heat Island heatmap showing summer temperature differentials across neighborhoods' WHERE slug = 'dallas-urban-heat-island-effect-energy-hvac';
