@@ -26,11 +26,10 @@ CREATE POLICY "Admins can manage blog tags" ON blog_tags
   USING (EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = auth.uid() AND user_roles.role IN ('super_admin', 'admin')))
   WITH CHECK (EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = auth.uid() AND user_roles.role IN ('super_admin', 'admin')));
 
--- 4. button_clicks
-DROP POLICY IF EXISTS "Admins can view button clicks" ON button_clicks;
-CREATE POLICY "Admins can view button clicks" ON button_clicks
-  FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = auth.uid() AND user_roles.role IN ('super_admin', 'admin')));
+-- 4. button_clicks -- SKIPPED: this table exists in Truficient's live DB
+-- (created directly via the Lovable dashboard, not through any migration
+-- in this history) but doesn't exist in a fresh database built purely from
+-- migrations, and it's out of scope for trade-os-crm anyway.
 
 -- 5. crm_campaign_tags
 DROP POLICY IF EXISTS "Admins can manage campaign tags" ON crm_campaign_tags;
