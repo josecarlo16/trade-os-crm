@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getCurrentTenantId } from '@/integrations/supabase/client';
 import { useUserRole } from './useUserRole';
 
 const CACHE_KEY = 'cached_permissions';
@@ -70,10 +70,12 @@ export const useRolePermissions = (): UseRolePermissionsResult => {
     setLoading(true);
 
     try {
+      const tenantId = await getCurrentTenantId();
       const { data, error } = await withTimeout(
         supabase
           .from('role_permissions')
           .select('permission_key, enabled')
+          .eq('tenant_id', tenantId)
           .eq('role', role)
           .eq('enabled', true),
         PERMISSIONS_FETCH_TIMEOUT_MS,

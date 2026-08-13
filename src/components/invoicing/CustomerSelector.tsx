@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, freshChannel } from '@/integrations/supabase/client';
 import { useOttoCustomers, useCreateOttoCustomer } from '@/hooks/useOttoPay';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -40,8 +40,7 @@ export function CustomerSelector({ value, onChange }: CustomerSelectorProps) {
 
   // Subscribe to realtime CRM customer changes
   useEffect(() => {
-    const channel = supabase
-      .channel('crm-customers-invoicing')
+    const channel = freshChannel('crm-customers-invoicing')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'crm_customers' }, () => {
         queryClient.invalidateQueries({ queryKey: ['crm-customers-for-invoicing'] });
       })

@@ -117,3 +117,20 @@ supabase.from = (table: string) => {
 export async function getCurrentTenantId(): Promise<string | null> {
   return ensureTenantId();
 }
+
+/**
+ * Use instead of `supabase.channel(name)` for realtime subscriptions.
+ *
+ * React 18 StrictMode double-invokes effects in dev: the first mount's
+ * cleanup (`removeChannel`) can still be in flight when the second mount
+ * tries to `.subscribe()` a channel with the same name, throwing "cannot
+ * add postgres_changes callbacks ... after subscribe()" because
+ * supabase-js reuses the existing channel instance for that topic. This
+ * clears out any stale channel with the same name first.
+ */
+export function freshChannel(name: string) {
+  supabase.getChannels()
+    .filter((c) => c.topic === `realtime:${name}`)
+    .forEach((c) => supabase.removeChannel(c));
+  return supabase.channel(name);
+}

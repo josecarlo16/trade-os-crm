@@ -54,6 +54,10 @@ const AdminAISettings = lazy(() => import("./pages/admin/AISettings"));
 const AdminAutomations = lazy(() => import("./pages/admin/Automations"));
 const AdminRolePermissions = lazy(() => import("./pages/admin/RolePermissions"));
 const AdminTasks = lazy(() => import("./pages/admin/Tasks"));
+const AdminDFWWatchList = lazy(() => import("./pages/admin/DFWWatchList"));
+const AdminFinancingOptions = lazy(() => import("./pages/admin/FinancingOptions"));
+const AdminCosts = lazy(() => import("./pages/admin/AdminCosts"));
+const AdminDuctlessConfig = lazy(() => import("./pages/admin/DuctlessConfig"));
 const AdminInbox = lazy(() => import("./pages/admin/Inbox"));
 const AdminEmailTemplates = lazy(() => import("./pages/admin/EmailTemplates"));
 const AdminEmailSettings = lazy(() => import("./pages/admin/EmailSettings"));
@@ -149,6 +153,10 @@ const router = createBrowserRouter([
       { path: "/admin/automations", element: <ProtectedRoute><AdminAutomations /></ProtectedRoute> },
       { path: "/admin/permissions", element: <ProtectedRoute><AdminRolePermissions /></ProtectedRoute> },
       { path: "/admin/tasks", element: <ProtectedRoute><AdminTasks /></ProtectedRoute> },
+      { path: "/admin/dfw-watchlist", element: <ProtectedRoute><AdminDFWWatchList /></ProtectedRoute> },
+      { path: "/admin/financing", element: <ProtectedRoute><AdminFinancingOptions /></ProtectedRoute> },
+      { path: "/admin/admin-costs", element: <ProtectedRoute><AdminCosts /></ProtectedRoute> },
+      { path: "/admin/ductless-config", element: <ProtectedRoute><AdminDuctlessConfig /></ProtectedRoute> },
       { path: "/admin/inbox", element: <ProtectedRoute><AdminInbox /></ProtectedRoute> },
       { path: "/admin/email-templates", element: <ProtectedRoute><AdminEmailTemplates /></ProtectedRoute> },
       { path: "/admin/email-settings", element: <ProtectedRoute><AdminEmailSettings /></ProtectedRoute> },

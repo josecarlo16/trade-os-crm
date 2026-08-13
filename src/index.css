@@ -110,8 +110,16 @@
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
   }
 
   /* Prevent iOS zoom on input focus */
@@ -171,6 +179,50 @@
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Thin, invisible-until-interacted scrollbar for app chrome (sidebar nav, main content) */
+  .thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 10px;
+  }
+
+  .thin-scrollbar:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
+
+  .thin-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .thin-scrollbar:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  /* Dark-background variant (sidebar) */
+  .thin-scrollbar-dark:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+
+  .thin-scrollbar-dark:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .thin-scrollbar-dark:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
   }
 
   /* Dynamic viewport height for mobile browsers */

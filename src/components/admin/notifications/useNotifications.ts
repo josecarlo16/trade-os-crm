@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, freshChannel } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface Notification {
@@ -42,8 +42,7 @@ export function useNotifications() {
   // Realtime subscription
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel('admin-notifications-realtime')
+    const channel = freshChannel('admin-notifications-realtime')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

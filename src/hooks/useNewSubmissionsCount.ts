@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, freshChannel } from '@/integrations/supabase/client';
 
 /**
  * Counts unread/new submissions across all tracked form tables.
@@ -46,8 +46,7 @@ export function useNewSubmissionsCount() {
     };
     run();
 
-    const channel = supabase
-      .channel('new-submissions-count')
+    const channel = freshChannel('new-submissions-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_submissions' }, fetchCount)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ducted_estimate_submissions' }, fetchCount)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ductless_estimate_submissions' }, fetchCount)

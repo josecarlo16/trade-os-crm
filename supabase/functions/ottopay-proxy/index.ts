@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // --- Auth: require valid Supabase JWT ---
+  // --- Auth: require valid Supabase JWT, then resolve the caller's tenant ---
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     console.error("[ottopay-proxy] Missing or malformed auth header");
@@ -46,9 +46,12 @@ Deno.serve(async (req) => {
     );
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  let tenantId: string;
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const sb = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -60,6 +63,26 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Resolve tenant with the service role client — RLS on user_roles is
+    // fine for the user's own client too, but service role avoids any doubt.
+    const admin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: roleRow, error: roleError } = await admin
+      .from("user_roles")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (roleError || !roleRow?.tenant_id) {
+      console.error("[ottopay-proxy] No tenant for user:", user.id);
+      return new Response(
+        JSON.stringify({ success: false, error: "User has no tenant assigned" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    tenantId = roleRow.tenant_id;
   } catch (e) {
     console.error("[ottopay-proxy] Auth exception:", e);
     return new Response(
@@ -68,15 +91,49 @@ Deno.serve(async (req) => {
     );
   }
 
-  // --- Read secrets (server-side only) ---
-  const OTTO_URL = Deno.env.get("OTTOPAY_SUPABASE_URL") || Deno.env.get("VITE_OTTOPAY_SUPABASE_URL");
-  const SYNC_KEY = Deno.env.get("OTTOPAY_SYNC_KEY") || Deno.env.get("VITE_OTTOPAY_SYNC_KEY");
-  const BUSINESS_ID = Deno.env.get("OTTOPAY_BUSINESS_ID") || Deno.env.get("VITE_OTTOPAY_BUSINESS_ID");
+  // --- Read this tenant's own Otto Pay connection (never a shared/global one —
+  // each tenant has their own Otto Pay business, config lives in
+  // integration_configs so no two tenants can ever be routed to the same
+  // Otto Pay business account). ---
+  const admin = createClient(supabaseUrl, supabaseServiceKey);
+  const { data: config, error: configError } = await admin
+    .from("integration_configs")
+    .select("config, is_active")
+    .eq("tenant_id", tenantId)
+    .eq("integration_name", "ottopay")
+    .single();
+
+  if (configError || !config) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Otto Pay not configured for this account" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  if (!config.is_active) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Otto Pay integration is disabled" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Truficient's connection currently lives in env secrets from before
+  // multi-tenancy existed. Only THAT specific tenant may fall back to them —
+  // any other tenant without its own config.config values must configure
+  // their own Otto Pay business, never silently inherit Truficient's.
+  const TRUFICIENT_TENANT_ID = "cb75a3f3-f310-4587-a4cc-098f50aef59c";
+  const isLegacyTenant = tenantId === TRUFICIENT_TENANT_ID;
+
+  const OTTO_URL = config.config?.supabase_url ||
+    (isLegacyTenant ? (Deno.env.get("OTTOPAY_SUPABASE_URL") || Deno.env.get("VITE_OTTOPAY_SUPABASE_URL")) : undefined);
+  const SYNC_KEY = config.config?.sync_key ||
+    (isLegacyTenant ? (Deno.env.get("OTTOPAY_SYNC_KEY") || Deno.env.get("VITE_OTTOPAY_SYNC_KEY")) : undefined);
+  const BUSINESS_ID = config.config?.business_id ||
+    (isLegacyTenant ? (Deno.env.get("OTTOPAY_BUSINESS_ID") || Deno.env.get("VITE_OTTOPAY_BUSINESS_ID")) : undefined);
 
   if (!OTTO_URL || !SYNC_KEY || !BUSINESS_ID) {
-    console.error("[ottopay-proxy] Missing Otto Pay secrets");
+    console.error("[ottopay-proxy] Incomplete Otto Pay config for tenant", tenantId);
     return new Response(
-      JSON.stringify({ success: false, error: "Otto Pay not configured on server" }),
+      JSON.stringify({ success: false, error: "Otto Pay not fully configured for this account" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

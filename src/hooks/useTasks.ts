@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, freshChannel } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface AdminTask {
@@ -44,8 +44,7 @@ export function useTasks() {
   // Realtime
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel('admin-tasks-realtime')
+    const channel = freshChannel('admin-tasks-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_tasks' }, () => {
         fetchTasks();
       })
