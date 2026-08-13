@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, freshChannel } from '@/integrations/supabase/client';
 
 export function useOpenSeoActions() {
   const [count, setCount] = useState(0);
@@ -14,8 +14,7 @@ export function useOpenSeoActions() {
       if (active) setCount(c || 0);
     };
     fetchCount();
-    const channel = supabase
-      .channel('seo-actions-count')
+    const channel = freshChannel('seo-actions-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'seo_report_actions' }, fetchCount)
       .subscribe();
     return () => { active = false; supabase.removeChannel(channel); };

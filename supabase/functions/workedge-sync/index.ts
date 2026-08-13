@@ -31,6 +31,14 @@ interface WorkEdgeSyncRequest {
   searchQuery?: string;
 }
 
+// Truficient's WorkEdge connection currently lives in env secrets from
+// before multi-tenancy existed. Only THAT specific tenant may fall back to
+// them — any other tenant without its own config.config.api_key must
+// configure their own WorkEdge account, never silently inherit
+// Truficient's (that would push their customer data into Truficient's
+// actual WorkEdge business).
+const TRUFICIENT_TENANT_ID = 'cb75a3f3-f310-4587-a4cc-098f50aef59c';
+
 // WorkEdge → CRM stage name mapping
 const WE_STATUS_TO_STAGE: Record<string, string> = {
   scheduled: 'Estimate Scheduled',
@@ -40,8 +48,32 @@ const WE_STATUS_TO_STAGE: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-// === Daily Sync Logic ===
-async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): Promise<any> {
+// Resolves the calling user's tenant from their JWT (forwarded automatically
+// by supabase.functions.invoke). This function has verify_jwt = false so it
+// can log its own error responses, but every tenant-scoped action below
+// still requires a valid, resolvable tenant — there is no anonymous path.
+async function resolveTenantId(req: Request, supabaseAdmin: any): Promise<string> {
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!token) throw new Error('Missing Authorization token');
+
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !userData?.user) throw new Error('Invalid or expired token');
+
+  const { data: roleRow, error: roleError } = await supabaseAdmin
+    .from('user_roles')
+    .select('tenant_id')
+    .eq('user_id', userData.user.id)
+    .not('tenant_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (roleError || !roleRow?.tenant_id) throw new Error('User has no tenant assigned');
+  return roleRow.tenant_id;
+}
+
+// === Daily Sync Logic (runs once per tenant that has WorkEdge configured) ===
+async function executeDailySync(supabase: any, tenantId: string, apiUrl: string, apiKey: string): Promise<any> {
   const startTime = Date.now();
   const errors: any[] = [];
   let jobsCreated = 0;
@@ -76,6 +108,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
     const { data: defaultJobType } = await supabase
       .from('crm_job_types')
       .select('id')
+      .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .limit(1)
@@ -93,6 +126,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
         const { data: existingJob } = await supabase
           .from('crm_jobs')
           .select('id, current_stage_id, crm_job_stages!crm_jobs_current_stage_id_fkey(name)')
+          .eq('tenant_id', tenantId)
           .eq('workedge_project_id', weId)
           .is('deleted_at', null)
           .maybeSingle();
@@ -109,6 +143,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
               const { data: targetStage } = await supabase
                 .from('crm_job_stages')
                 .select('id')
+                .eq('tenant_id', tenantId)
                 .eq('name', targetStageName)
                 .eq('is_active', true)
                 .limit(1)
@@ -121,12 +156,14 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
                     current_stage_id: targetStage.id,
                     workedge_last_sync: new Date().toISOString(),
                   })
-                  .eq('id', existingJob.id);
+                  .eq('id', existingJob.id)
+                  .eq('tenant_id', tenantId);
 
                 // Log stage history
                 await supabase
                   .from('crm_job_stage_history')
                   .insert({
+                    tenant_id: tenantId,
                     job_id: existingJob.id,
                     from_stage_id: existingJob.current_stage_id,
                     to_stage_id: targetStage.id,
@@ -150,6 +187,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
             const { data: matchedCustomer } = await supabase
               .from('crm_customers')
               .select('id')
+              .eq('tenant_id', tenantId)
               .or(`first_name.ilike.${firstName},last_name.ilike.${lastName}`)
               .is('deleted_at', null)
               .limit(1)
@@ -175,6 +213,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
             const { data: stage } = await supabase
               .from('crm_job_stages')
               .select('id')
+              .eq('tenant_id', tenantId)
               .eq('name', targetStageName)
               .eq('is_active', true)
               .limit(1)
@@ -185,6 +224,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
           const { data: newJob, error: jobErr } = await supabase
             .from('crm_jobs')
             .insert({
+              tenant_id: tenantId,
               title: proj.name || `WorkEdge Import - ${weId}`,
               customer_id: customerId,
               job_type_id: defaultJobTypeId,
@@ -205,6 +245,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
             await supabase
               .from('crm_interactions')
               .insert({
+                tenant_id: tenantId,
                 customer_id: customerId,
                 interaction_type: 'system_workedge_import',
                 direction: null,
@@ -215,6 +256,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
             // Log initial stage history
             if (initialStageId) {
               await supabase.from('crm_job_stage_history').insert({
+                tenant_id: tenantId,
                 job_id: newJob.id,
                 to_stage_id: initialStageId,
                 notes: 'Initial stage from WorkEdge import',
@@ -242,11 +284,18 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
                 if (!attUrl && !attDesc) continue;
 
                 // Check for duplicate by URL in interaction content
-                if (attUrl) {
+                const { data: job } = await supabase
+                  .from('crm_jobs')
+                  .select('customer_id, job_number')
+                  .eq('id', jobId)
+                  .eq('tenant_id', tenantId)
+                  .single();
+
+                if (attUrl && job?.customer_id) {
                   const { data: existing } = await supabase
                     .from('crm_interactions')
                     .select('id')
-                    .eq('customer_id', (await supabase.from('crm_jobs').select('customer_id').eq('id', jobId).single()).data?.customer_id || '')
+                    .eq('customer_id', job.customer_id)
                     .ilike('content', `%${attUrl}%`)
                     .limit(1)
                     .maybeSingle();
@@ -254,14 +303,9 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
                   if (existing) continue;
                 }
 
-                const { data: job } = await supabase
-                  .from('crm_jobs')
-                  .select('customer_id, job_number')
-                  .eq('id', jobId)
-                  .single();
-
                 if (job?.customer_id) {
                   await supabase.from('crm_interactions').insert({
+                    tenant_id: tenantId,
                     customer_id: job.customer_id,
                     interaction_type: 'note',
                     direction: null,
@@ -289,6 +333,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
 
   // Write to daily sync log
   await supabase.from('workedge_daily_sync_log').insert({
+    tenant_id: tenantId,
     jobs_created: jobsCreated,
     jobs_updated: jobsUpdated,
     attachments_synced: attachmentsSynced,
@@ -301,6 +346,7 @@ async function executeDailySync(supabase: any, apiUrl: string, apiKey: string): 
   await supabase
     .from('integration_configs')
     .update({ last_sync_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
     .eq('integration_name', 'workedge');
 
   return { success: true, status, jobs_created: jobsCreated, jobs_updated: jobsUpdated, attachments_synced: attachmentsSynced, errors: errors.length, duration_ms: durationMs };
@@ -317,16 +363,59 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get WorkEdge API configuration
+    const body: WorkEdgeSyncRequest = await req.json();
+    const { action, jobId, customerId, locationId, workedgeProjectId } = body;
+
+    // daily-sync is meant to run on a schedule with no calling user — it
+    // fans out across every tenant that has an active WorkEdge connection,
+    // instead of assuming a single global config. Every other action is
+    // triggered by a signed-in user and is scoped to that user's own tenant.
+    if (action === 'daily-sync') {
+      const { data: activeConfigs, error: configsError } = await supabase
+        .from('integration_configs')
+        .select('tenant_id, config')
+        .eq('integration_name', 'workedge')
+        .eq('is_active', true);
+
+      if (configsError) throw configsError;
+
+      const globalFallbackKey = Deno.env.get('WORKEDGE_API_KEY');
+      const results = [];
+      for (const cfg of activeConfigs || []) {
+        const apiKey = cfg.config?.api_key ||
+          (cfg.tenant_id === TRUFICIENT_TENANT_ID ? globalFallbackKey : undefined);
+        if (!apiKey) {
+          results.push({ tenant_id: cfg.tenant_id, error: 'No WorkEdge API key configured for this tenant' });
+          continue;
+        }
+        const apiUrl = cfg.config?.api_url || 'https://api.workedge.pro';
+        try {
+          const tenantResult = await executeDailySync(supabase, cfg.tenant_id, apiUrl, apiKey);
+          results.push({ tenant_id: cfg.tenant_id, ...tenantResult });
+        } catch (e: any) {
+          results.push({ tenant_id: cfg.tenant_id, error: e.message });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, tenants_synced: results.length, results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const tenantId = await resolveTenantId(req, supabase);
+
+    // Get this tenant's WorkEdge API configuration
     const { data: config, error: configError } = await supabase
       .from('integration_configs')
       .select('*')
+      .eq('tenant_id', tenantId)
       .eq('integration_name', 'workedge')
       .single();
 
     if (configError || !config) {
       return new Response(
-        JSON.stringify({ error: 'WorkEdge integration not configured' }),
+        JSON.stringify({ error: 'WorkEdge integration not configured for this account' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -338,22 +427,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    const WORKEDGE_API_KEY = Deno.env.get('WORKEDGE_API_KEY');
+    const WORKEDGE_API_KEY = config.config?.api_key ||
+      (tenantId === TRUFICIENT_TENANT_ID ? Deno.env.get('WORKEDGE_API_KEY') : undefined);
     if (!WORKEDGE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'WORKEDGE_API_KEY not configured' }),
+        JSON.stringify({ error: 'No WorkEdge API key configured for this account' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const body: WorkEdgeSyncRequest = await req.json();
-    const { action, jobId, customerId, locationId, workedgeProjectId } = body;
 
     const apiUrl = config.config?.api_url || 'https://api.workedge.pro';
     let result: any = null;
 
     // Log the sync attempt
     const logEntry = {
+      tenant_id: tenantId,
       entity_type: action.includes('project') ? 'project' : action.includes('customer') ? 'customer' : 'equipment',
       local_id: jobId || customerId || locationId,
       sync_direction: action.startsWith('get') ? 'pull' : 'push',
@@ -382,6 +470,7 @@ Deno.serve(async (req) => {
               job_type:crm_job_types(*)
             `)
             .eq('id', jobId)
+            .eq('tenant_id', tenantId)
             .single();
 
           if (jobError || !job) throw new Error('Job not found');
@@ -419,11 +508,12 @@ Deno.serve(async (req) => {
           // Update job with WorkEdge project ID
           await supabase
             .from('crm_jobs')
-            .update({ 
+            .update({
               workedge_project_id: projectData.id,
               workedge_last_sync: new Date().toISOString()
             })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true, workedge_project_id: projectData.id };
           break;
@@ -436,6 +526,7 @@ Deno.serve(async (req) => {
             .from('crm_customers')
             .select('*')
             .eq('id', customerId)
+            .eq('tenant_id', tenantId)
             .single();
 
           if (customerError || !customer) throw new Error('Customer not found');
@@ -476,7 +567,8 @@ Deno.serve(async (req) => {
           await supabase
             .from('crm_customers')
             .update({ workedge_customer_id: weCustomerId })
-            .eq('id', customerId);
+            .eq('id', customerId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true, workedge_customer_id: weCustomerId };
           break;
@@ -489,6 +581,7 @@ Deno.serve(async (req) => {
             .from('crm_locations')
             .select('*, customer:crm_customers(*)')
             .eq('id', locationId)
+            .eq('tenant_id', tenantId)
             .single();
 
           if (locationError || !location) throw new Error('Location not found');
@@ -533,7 +626,8 @@ Deno.serve(async (req) => {
           await supabase
             .from('crm_locations')
             .update({ workedge_property_id: wePropertyId })
-            .eq('id', locationId);
+            .eq('id', locationId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true, workedge_property_id: wePropertyId };
           break;
@@ -541,6 +635,14 @@ Deno.serve(async (req) => {
 
         case 'get-project-media': {
           if (!workedgeProjectId || !jobId) throw new Error('workedgeProjectId and jobId are required');
+
+          const { data: mediaJob, error: mediaJobError } = await supabase
+            .from('crm_jobs')
+            .select('id')
+            .eq('id', jobId)
+            .eq('tenant_id', tenantId)
+            .single();
+          if (mediaJobError || !mediaJob) throw new Error('Job not found');
 
           const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 
@@ -605,6 +707,7 @@ Deno.serve(async (req) => {
           };
 
           const mediaRecords = allItems.map((item: any) => ({
+            tenant_id: tenantId,
             job_id: jobId,
             workedge_project_id: workedgeProjectId,
             media_type: item.type || item.media_type || item.file_type || item._defaultType,
@@ -636,7 +739,8 @@ Deno.serve(async (req) => {
           await supabase
             .from('workedge_project_media')
             .delete()
-            .eq('job_id', jobId);
+            .eq('job_id', jobId)
+            .eq('tenant_id', tenantId);
 
           if (mediaRecords.length > 0) {
             await supabase
@@ -647,7 +751,8 @@ Deno.serve(async (req) => {
           await supabase
             .from('crm_jobs')
             .update({ workedge_last_sync: new Date().toISOString() })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true, media_count: mediaRecords.length };
           break;
@@ -680,6 +785,7 @@ Deno.serve(async (req) => {
             .from('crm_jobs')
             .select('*, current_stage:crm_job_stages(*)')
             .eq('id', jobId)
+            .eq('tenant_id', tenantId)
             .single();
 
           const servicePayload = {
@@ -733,11 +839,12 @@ Deno.serve(async (req) => {
 
           await supabase
             .from('crm_jobs')
-            .update({ 
+            .update({
               workedge_project_id: workedgeProjectId,
               workedge_last_sync: new Date().toISOString()
             })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true, workedge_project_id: workedgeProjectId };
           break;
@@ -751,24 +858,21 @@ Deno.serve(async (req) => {
           // Clear the WorkEdge project ID from the job
           await supabase
             .from('crm_jobs')
-            .update({ 
+            .update({
               workedge_project_id: null,
               workedge_last_sync: null
             })
-            .eq('id', jobId);
+            .eq('id', jobId)
+            .eq('tenant_id', tenantId);
 
           // Delete synced media from local table
           await supabase
             .from('workedge_project_media')
             .delete()
-            .eq('job_id', jobId);
+            .eq('job_id', jobId)
+            .eq('tenant_id', tenantId);
 
           result = { success: true };
-          break;
-        }
-
-        case 'daily-sync': {
-          result = await executeDailySync(supabase, apiUrl, WORKEDGE_API_KEY);
           break;
         }
 
@@ -792,6 +896,7 @@ Deno.serve(async (req) => {
       await supabase
         .from('integration_configs')
         .update({ last_sync_at: new Date().toISOString() })
+        .eq('tenant_id', tenantId)
         .eq('integration_name', 'workedge');
 
       return new Response(

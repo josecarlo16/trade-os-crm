@@ -14,7 +14,7 @@ export const AssistantToggle = ({ badgeCount = 0 }: AssistantToggleProps) => {
     <button
       onClick={togglePanel}
       className={`fixed z-50 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center
-        ${isMobile ? 'w-12 h-12 bottom-44 right-5' : 'w-14 h-14 bottom-48 right-6'}
+        ${isMobile ? 'w-12 h-12 bottom-2 right-5' : 'w-14 h-14 bottom-2 right-6'}
         bg-[#1B2A4A] hover:scale-105 hover:shadow-xl`}
       aria-label={isOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
     >

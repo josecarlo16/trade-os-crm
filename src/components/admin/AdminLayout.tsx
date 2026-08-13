@@ -34,7 +34,7 @@ export const AdminLayout = ({ children, title }: AdminLayoutProps) => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <div className="hidden md:block">
         <AdminSidebar />
       </div>
@@ -50,7 +50,7 @@ export const AdminLayout = ({ children, title }: AdminLayoutProps) => {
           title={title} 
           onMenuClick={() => setMobileMenuOpen(true)} 
         />
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 p-4 lg:p-6 overflow-auto thin-scrollbar">
           {children}
         </main>
       </div>

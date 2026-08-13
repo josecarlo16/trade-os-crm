@@ -69,7 +69,7 @@ export const AdminSidebar = () => {
   return (
     <aside 
       className={cn(
-        "bg-[#1e3a5f] min-h-screen flex flex-col transition-all duration-300",
+        "bg-[#1e3a5f] h-screen flex flex-col transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -88,7 +88,12 @@ export const AdminSidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 overflow-y-auto">
+      <nav
+        className={cn(
+          "flex-1 p-4 overflow-y-auto",
+          collapsed ? "scrollbar-hide" : "thin-scrollbar thin-scrollbar-dark"
+        )}
+      >
         <div className="space-y-2">
           {visibleSections.map((section) => (
             <Collapsible

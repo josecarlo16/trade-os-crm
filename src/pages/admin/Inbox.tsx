@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, freshChannel } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -216,8 +216,7 @@ export default function AdminInbox() {
 
   // Realtime subscription
   useEffect(() => {
-    const channel = supabase
-      .channel("crm-email-log-realtime")
+    const channel = freshChannel("crm-email-log-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "crm_email_log" }, () => {
         queryClient.invalidateQueries({ queryKey: ["crm-emails"] });
       })
