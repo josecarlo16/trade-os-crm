@@ -75,6 +75,21 @@ const InvoiceExpenses = lazy(() => import("./pages/admin/invoicing/InvoiceExpens
 const InvoiceReports = lazy(() => import("./pages/admin/invoicing/InvoiceReports"));
 const InvoiceSettings = lazy(() => import("./pages/admin/invoicing/InvoiceSettings"));
 const AdminSocialStudio = lazy(() => import("./pages/admin/SocialStudio"));
+const AdminBlogPosts = lazy(() => import("./pages/admin/BlogPosts"));
+const AdminBlogPostEditor = lazy(() => import("./pages/admin/BlogPostEditor"));
+const AdminGallery = lazy(() => import("./pages/admin/Gallery"));
+const AdminSEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
+const AdminSEOEditor = lazy(() => import("./pages/admin/SEOEditor"));
+const AdminSEOPerformance = lazy(() => import("./pages/admin/SEOPerformance"));
+const AdminSEOUpload = lazy(() => import("./pages/admin/SEOUpload"));
+const AdminCalculators = lazy(() => import("./pages/admin/Calculators"));
+const AdminCalculatorEditor = lazy(() => import("./pages/admin/CalculatorEditor"));
+const AdminLandingPageForms = lazy(() => import("./pages/admin/LandingPageForms"));
+const AdminLandingPageFormEditor = lazy(() => import("./pages/admin/LandingPageFormEditor"));
+const AdminScannerAnalytics = lazy(() => import("./pages/admin/ScannerAnalytics"));
+const AdminButtonClicks = lazy(() => import("./pages/admin/ButtonClicks"));
+const AdminAnalyticsTracking = lazy(() => import("./pages/admin/AnalyticsTracking"));
+const AdminSocialMediaTracker = lazy(() => import("./pages/admin/SocialMediaTracker"));
 
 import { ProtectedRoute } from "./components/admin/ProtectedRoute";
 
@@ -173,6 +188,22 @@ const router = createBrowserRouter([
       { path: "/admin/invoice-customers", element: <Navigate to="/admin/invoice-clients" replace /> },
       { path: "/admin/knowledge-base", element: <ProtectedRoute><AdminKnowledgeBase /></ProtectedRoute> },
       { path: "/admin/social-studio", element: <ProtectedRoute><AdminSocialStudio /></ProtectedRoute> },
+      { path: "/admin/blog", element: <ProtectedRoute><AdminBlogPosts /></ProtectedRoute> },
+      { path: "/admin/blog/:id", element: <ProtectedRoute><AdminBlogPostEditor /></ProtectedRoute> },
+      { path: "/admin/gallery", element: <ProtectedRoute><AdminGallery /></ProtectedRoute> },
+      { path: "/admin/seo", element: <ProtectedRoute><AdminSEOManagement /></ProtectedRoute> },
+      { path: "/admin/seo-performance", element: <ProtectedRoute><AdminSEOPerformance /></ProtectedRoute> },
+      { path: "/admin/seo/upload", element: <ProtectedRoute><AdminSEOUpload /></ProtectedRoute> },
+      { path: "/admin/seo/:id", element: <ProtectedRoute><AdminSEOEditor /></ProtectedRoute> },
+      { path: "/admin/calculators", element: <ProtectedRoute><AdminCalculators /></ProtectedRoute> },
+      { path: "/admin/calculators/:id", element: <ProtectedRoute><AdminCalculatorEditor /></ProtectedRoute> },
+      { path: "/admin/landing-pages", element: <ProtectedRoute><AdminLandingPageForms /></ProtectedRoute> },
+      { path: "/admin/landing-pages/new", element: <ProtectedRoute><AdminLandingPageFormEditor /></ProtectedRoute> },
+      { path: "/admin/landing-pages/:id", element: <ProtectedRoute><AdminLandingPageFormEditor /></ProtectedRoute> },
+      { path: "/admin/scanner-analytics", element: <ProtectedRoute><AdminScannerAnalytics /></ProtectedRoute> },
+      { path: "/admin/button-clicks", element: <ProtectedRoute><AdminButtonClicks /></ProtectedRoute> },
+      { path: "/admin/analytics", element: <ProtectedRoute><AdminAnalyticsTracking /></ProtectedRoute> },
+      { path: "/admin/social-media", element: <ProtectedRoute><AdminSocialMediaTracker /></ProtectedRoute> },
     ],
   },
   { path: "*", element: <NotFound /> },
