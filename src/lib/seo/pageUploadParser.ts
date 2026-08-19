@@ -90,16 +90,25 @@ export function parseFile(fileName: string, raw: string): ParsedPage {
     afterFm = raw.slice(fmMatch[0].length);
   }
 
-  // JSON-LD fenced block
+  // JSON-LD fenced block. Supports two shapes:
+  //   ```json
+  //   { ... }
+  //   ```
+  // and the ```html-wrapped <script type="application/ld+json"> form that the
+  // page-generation spec actually emits.
   const jsonMatch = afterFm.match(/```json\s*\n([\s\S]*?)\n```/);
-  if (jsonMatch) {
-    schemaRaw = jsonMatch[1];
+  const htmlScriptMatch = afterFm.match(
+    /```html\s*\n<script type="application\/ld\+json">\s*\n?([\s\S]*?)\n?<\/script>\s*\n```/
+  );
+  const schemaMatch = jsonMatch || htmlScriptMatch;
+  if (schemaMatch) {
+    schemaRaw = schemaMatch[1];
     try {
       schemaJson = JSON.parse(schemaRaw);
     } catch {
       schemaJson = null;
     }
-    body = afterFm.slice(0, jsonMatch.index).trim() + '\n\n' + afterFm.slice((jsonMatch.index || 0) + jsonMatch[0].length).trim();
+    body = afterFm.slice(0, schemaMatch.index).trim() + '\n\n' + afterFm.slice((schemaMatch.index || 0) + schemaMatch[0].length).trim();
     body = body.trim();
   } else {
     body = afterFm.trim();

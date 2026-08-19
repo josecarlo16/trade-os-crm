@@ -1,7 +1,9 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrentTenant } from '@/hooks/useCurrentTenant';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-import { ExternalLink, User, Menu } from 'lucide-react';
+import { ExternalLink, User, Menu, Building2 } from 'lucide-react';
 import { NotificationBell } from './notifications/NotificationBell';
 import { GlobalSearch } from './GlobalSearch';
 import {
@@ -19,6 +21,7 @@ interface AdminHeaderProps {
 
 export const AdminHeader = ({ title, onMenuClick }: AdminHeaderProps) => {
   const { user, signOut } = useAuth();
+  const tenantName = useCurrentTenant();
 
   const handleSignOut = async () => {
     await signOut();
@@ -41,6 +44,12 @@ export const AdminHeader = ({ title, onMenuClick }: AdminHeaderProps) => {
       </div>
       
       <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
+        {tenantName && (
+          <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 py-1.5">
+            <Building2 className="h-3.5 w-3.5" />
+            {tenantName}
+          </Badge>
+        )}
         <GlobalSearch />
         <NotificationBell />
         <Button variant="outline" size="sm" asChild className="hidden sm:flex">
