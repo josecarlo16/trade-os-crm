@@ -72,6 +72,26 @@ export default {
         },
         sage: "hsl(var(--sage))",
         slate: "hsl(var(--slate))",
+        // Trade OS dashboard palette — only resolves inside a .trade-os
+        // wrapper (see src/index.css); unused elsewhere in the admin app.
+        tradeos: {
+          page: "hsl(var(--to-page))",
+          surface: "hsl(var(--to-surface))",
+          "surface-2": "hsl(var(--to-surface-2))",
+          ink: "hsl(var(--to-ink))",
+          "ink-2": "hsl(var(--to-ink-2))",
+          "ink-3": "hsl(var(--to-ink-3))",
+          line: "hsl(var(--to-line))",
+          "line-strong": "hsl(var(--to-line-strong))",
+          steel: "hsl(var(--to-steel))",
+          "steel-2": "hsl(var(--to-steel-2))",
+          "steel-ink": "hsl(var(--to-steel-ink))",
+          accent: "hsl(var(--to-accent))",
+          "accent-ink": "hsl(var(--to-accent-ink))",
+          good: "hsl(var(--to-good))",
+          warn: "hsl(var(--to-warn))",
+          crit: "hsl(var(--to-crit))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -81,6 +101,10 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         display: ["Inter", "system-ui", "sans-serif"],
+        // Trade OS dashboard type system — additive, doesn't touch sans/display.
+        condensed: ['"Barlow Condensed"', "system-ui", "sans-serif"],
+        tradeBody: ["Barlow", "system-ui", "sans-serif"],
+        tradeMono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
       },
       fontSize: {
         // Mobile-first typography scale

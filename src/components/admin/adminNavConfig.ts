@@ -39,9 +39,8 @@ import {
   Building2,
   Mail,
   BookOpen,
-  Truck
-
-
+  Truck,
+  LayoutGrid,
 
 } from 'lucide-react';
 
@@ -62,6 +61,7 @@ export const navSections: NavSection[] = [
     title: 'Overview',
     items: [
       { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, permissionKey: 'nav.dashboard' },
+      { label: 'Trade OS', href: '/admin/trade-os', icon: LayoutGrid, permissionKey: 'nav.trade-os' },
       { label: 'Tasks', href: '/admin/tasks', icon: ClipboardList, permissionKey: 'nav.tasks' },
       { label: 'Abandoned Carts', href: '/admin/abandoned-carts', icon: ShoppingCart, permissionKey: 'nav.abandoned-carts' },
     ],

@@ -103,6 +103,49 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /*
+   * Trade OS dashboard theme — scoped to .trade-os so it never touches the
+   * existing Truficient admin palette above. Steel/orange industrial
+   * palette, matching the client-approved dashboard mockup.
+   */
+  .trade-os {
+    --to-page: 210 14% 95%;
+    --to-surface: 0 0% 99%;
+    --to-surface-2: 210 13% 96%;
+    --to-ink: 200 16% 11%;
+    --to-ink-2: 200 9% 33%;
+    --to-ink-3: 200 7% 57%;
+    --to-line: 210 12% 89%;
+    --to-line-strong: 210 10% 81%;
+    --to-steel: 205 22% 12%;
+    --to-steel-2: 205 19% 17%;
+    --to-steel-ink: 205 16% 91%;
+    --to-accent: 21 89% 45%;
+    --to-accent-ink: 21 84% 38%;
+    --to-good: 122 71% 34%;
+    --to-warn: 41 96% 55%;
+    --to-crit: 4 62% 51%;
+  }
+
+  .dark .trade-os {
+    --to-page: 200 14% 7%;
+    --to-surface: 200 13% 10%;
+    --to-surface-2: 200 12% 12%;
+    --to-ink: 60 9% 94%;
+    --to-ink-2: 200 8% 70%;
+    --to-ink-3: 200 6% 50%;
+    --to-line: 200 12% 18%;
+    --to-line-strong: 200 10% 24%;
+    --to-steel: 205 24% 8%;
+    --to-steel-2: 205 20% 11%;
+    --to-steel-ink: 205 16% 91%;
+    --to-accent: 21 100% 60%;
+    --to-accent-ink: 21 100% 68%;
+    --to-good: 122 55% 52%;
+    --to-warn: 41 96% 58%;
+    --to-crit: 4 78% 66%;
+  }
 }
 
 @layer base {

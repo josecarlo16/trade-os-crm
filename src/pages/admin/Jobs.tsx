@@ -134,16 +134,29 @@ export default function Jobs() {
     }
   };
 
-  // Board type from URL or default
+  // Board type from URL or default. Accepts either a board key ('service' /
+  // 'install') or a full job-type slug (e.g. 'residential-installation',
+  // as linked from JobTypeBoardPreview's "View All") — matches by
+  // slugPattern substring when there's no exact key match, instead of
+  // silently falling through to an unrecognized key and rendering an empty
+  // board.
+  const resolveBoardKey = (urlType: string | null): string => {
+    if (!urlType) return BOARD_CATEGORIES[0].key;
+    const exact = BOARD_CATEGORIES.find(b => b.key === urlType);
+    if (exact) return exact.key;
+    const bySlug = BOARD_CATEGORIES.find(b => urlType.includes(b.slugPattern));
+    return bySlug ? bySlug.key : BOARD_CATEGORIES[0].key;
+  };
+
   const [activeBoardKey, setActiveBoardKey] = useState<string>(
-    searchParams.get('type') || BOARD_CATEGORIES[0].key
+    resolveBoardKey(searchParams.get('type'))
   );
 
   // Sync URL param
   useEffect(() => {
     const urlType = searchParams.get('type');
-    if (urlType && BOARD_CATEGORIES.some(b => b.key === urlType)) {
-      setActiveBoardKey(urlType);
+    if (urlType) {
+      setActiveBoardKey(resolveBoardKey(urlType));
     }
   }, [searchParams]);
 

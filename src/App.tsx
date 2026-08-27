@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 const AdminRouteLayout = lazy(() => import("./components/admin/AdminRouteLayout").then(m => ({ default: m.AdminRouteLayout })));
 const AdminLogin = lazy(() => import("./pages/admin/Login"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const TradeOSApp = lazy(() => import("./pages/admin/trade-os"));
 const AdminUnifiedSubmissions = lazy(() => import("./pages/admin/UnifiedSubmissions"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
@@ -123,6 +124,7 @@ const router = createBrowserRouter([
     element: <LazyAdminLayout />,
     children: [
       { path: "/admin", element: <ProtectedRoute><AdminDashboard /></ProtectedRoute> },
+      { path: "/admin/trade-os/*", element: <Suspense fallback={<PageLoader />}><ProtectedRoute><TradeOSApp /></ProtectedRoute></Suspense> },
       { path: "/admin/search", element: <ProtectedRoute><AdminSearchResults /></ProtectedRoute> },
       { path: "/admin/abandoned-carts", element: <ProtectedRoute><AdminAbandonedCarts /></ProtectedRoute> },
       { path: "/admin/customers", element: <ProtectedRoute><AdminCustomers /></ProtectedRoute> },
