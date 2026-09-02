@@ -2,7 +2,28 @@ import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpRight, Lock } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, Lock } from 'lucide-react';
+
+/** Noticeable "this module is really a separate app" banner — client asked for this on WorkEdge, 2026-08-27. */
+export function OpenAppBanner({ label, url }: { label: string; url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-4 flex items-center gap-3 rounded-lg border border-tradeos-accent bg-tradeos-accent/10 px-4 py-3 transition-colors hover:bg-tradeos-accent/15"
+    >
+      <div className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-tradeos-accent text-white">
+        <ExternalLink className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-condensed text-sm font-bold uppercase tracking-wide text-tradeos-accent-ink">Go to the {label} app</p>
+        <p className="text-xs text-tradeos-ink-3">Opens {label} in a new tab — this page is just a summary.</p>
+      </div>
+      <ArrowUpRight className="h-5 w-5 flex-none text-tradeos-accent-ink" />
+    </a>
+  );
+}
 
 export function ModuleCard({
   title,

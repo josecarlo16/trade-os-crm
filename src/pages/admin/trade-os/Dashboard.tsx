@@ -7,12 +7,12 @@ import { RevenueSummary } from '@/components/admin/dashboard/RevenueSummary';
 import { useDashboardSummary } from '@/hooks/useDashboardSummary';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useTradeOSLayoutPrefs } from '@/hooks/useTradeOSLayoutPrefs';
-import { toRoleTemplate, ROLE_BLOCKS, BlockId } from '@/lib/tradeOSRoles';
+import { toRoleTemplate, ROLE_BLOCKS, BlockId, EXTERNAL_APP_URLS } from '@/lib/tradeOSRoles';
 import { useCustomizeMode } from '@/components/tradeos/CustomizeModeContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Wrench, Users, DollarSign, BarChart3, MessageSquare, ClipboardCheck, Megaphone, FileText, Package, Eye } from 'lucide-react';
+import { Wrench, Users, DollarSign, BarChart3, MessageSquare, ClipboardCheck, Megaphone, FileText, Package, Eye, ExternalLink } from 'lucide-react';
 import { ModuleCard, LinkOutModuleCard, LockedModuleCard } from '@/components/tradeos/ModuleCards';
 import { SortableBlock } from '@/components/tradeos/SortableBlock';
 import { ApprovalsCard } from '@/components/tradeos/ApprovalsCard';
@@ -59,7 +59,22 @@ export default function TradeOSDashboardPage() {
     switch (id) {
       case 'workedge_board':
         return (
-          <ModuleCard title="WorkEdge" icon={<Wrench className="h-3.5 w-3.5" />}>
+          <ModuleCard
+            title="WorkEdge"
+            icon={<Wrench className="h-3.5 w-3.5" />}
+            action={
+              EXTERNAL_APP_URLS.workedge_board && (
+                <a
+                  href={EXTERNAL_APP_URLS.workedge_board.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs font-semibold text-tradeos-accent-ink hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" /> Go to the app
+                </a>
+              )
+            }
+          >
             <Suspense fallback={<WidgetFallback />}>
               <JobTypeBoardPreview jobTypeSlug="residential-service-call" title="Service Calls Board" icon="wrench" />
             </Suspense>
