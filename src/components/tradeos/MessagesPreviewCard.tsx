@@ -32,9 +32,7 @@ export function MessagesPreviewCard() {
 
   if (isError) {
     return (
-      <p className="text-xs text-tradeos-ink-3">
-        Messages aren't wired to real data yet — the <code className="rounded bg-tradeos-surface-2 px-1 py-0.5 font-tradeMono text-[11px]">conversations</code>/<code className="rounded bg-tradeos-surface-2 px-1 py-0.5 font-tradeMono text-[11px]">messages</code> migration hasn't been applied to the database yet.
-      </p>
+      <p className="text-xs text-tradeos-ink-3">Couldn't load messages.</p>
     );
   }
 

@@ -21,7 +21,7 @@ interface AdminHeaderProps {
 
 export const AdminHeader = ({ title, onMenuClick }: AdminHeaderProps) => {
   const { user, signOut } = useAuth();
-  const tenantName = useCurrentTenant();
+  const { tenantName } = useCurrentTenant();
 
   const handleSignOut = async () => {
     await signOut();

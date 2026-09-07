@@ -415,9 +415,7 @@ function MessagesContent() {
     return (
       <Card className="bg-tradeos-surface border-tradeos-line">
         <CardContent className="py-10 text-center text-sm text-tradeos-ink-3">
-          Messaging isn't wired to real data yet — the <code className="rounded bg-tradeos-surface-2 px-1 py-0.5 font-tradeMono text-[11px]">conversations</code>/
-          <code className="rounded bg-tradeos-surface-2 px-1 py-0.5 font-tradeMono text-[11px]">threads</code>/
-          <code className="rounded bg-tradeos-surface-2 px-1 py-0.5 font-tradeMono text-[11px]">messages</code> migration hasn't been applied to the database yet.
+          Couldn't load messages. Try refreshing the page.
         </CardContent>
       </Card>
     );

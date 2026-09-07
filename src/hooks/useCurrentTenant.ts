@@ -1,36 +1,50 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getCurrentTenantId } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-export const useCurrentTenant = () => {
+interface UseCurrentTenantResult {
+  tenantId: string | null;
+  tenantName: string | null;
+  isLoading: boolean;
+}
+
+export const useCurrentTenant = (): UseCurrentTenantResult => {
   const { user } = useAuth();
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
+      setTenantId(null);
       setTenantName(null);
+      setIsLoading(false);
       return;
     }
 
     let cancelled = false;
+    setIsLoading(true);
 
     (async () => {
-      const { data: roleRow } = await supabase
-        .from('user_roles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const id = await getCurrentTenantId();
 
-      if (!roleRow?.tenant_id || cancelled) return;
+      if (!id || cancelled) {
+        if (!cancelled) setIsLoading(false);
+        return;
+      }
+
+      setTenantId(id);
 
       const { data: tenant } = await supabase
         .from('tenants')
         .select('name')
-        .eq('id', roleRow.tenant_id)
+        .eq('id', id)
         .maybeSingle();
 
-      if (!cancelled) setTenantName(tenant?.name ?? null);
+      if (!cancelled) {
+        setTenantName(tenant?.name ?? null);
+        setIsLoading(false);
+      }
     })();
 
     return () => {
@@ -38,5 +52,5 @@ export const useCurrentTenant = () => {
     };
   }, [user]);
 
-  return tenantName;
+  return { tenantId, tenantName, isLoading };
 };

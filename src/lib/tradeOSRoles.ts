@@ -66,11 +66,11 @@ export interface TradeOSNavItem {
  * (WorkEdge = workedge.pro, a whole other product/repo, not just a CRM
  * page). Client asked 2026-08-27 for a noticeable "open the app" link on
  * these so people aren't stuck in the summary view when they need the
- * real thing. Add an entry here once a module's external app URL is known
- * — OttoPay's isn't confirmed yet, so it's absent rather than guessed.
+ * real thing. Add an entry here once a module's external app URL is known.
  */
 export const EXTERNAL_APP_URLS: Partial<Record<BlockId, { label: string; url: string }>> = {
   workedge_board: { label: 'WorkEdge', url: 'https://workedge.pro' },
+  ar_collections: { label: 'OttoPay', url: 'https://ottopay.pro/' },
 };
 
 export const TRADE_OS_NAV: TradeOSNavItem[] = [

@@ -1,8 +1,7 @@
 -- =====================================================================
--- DRAFT FOR REVIEW — Trade OS native messaging, Phase 1 per
+-- Trade OS native messaging, Phase 1 per
 -- trade-os-messaging-agents-package.md: job-anchored threads + three
 -- general channels (Dispatch, Office, Leadership) + mentions + attachments.
--- Not numbered for apply yet.
 --
 -- Explicitly OUT of scope for this migration (flagged, not silently
 -- dropped): translation invocation (needs a Gemini API call — schema below

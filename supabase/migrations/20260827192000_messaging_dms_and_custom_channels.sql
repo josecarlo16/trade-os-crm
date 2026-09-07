@@ -5,8 +5,8 @@
 --   2. Admin-created custom channels (conversations.kind = 'general' with
 --      an arbitrary name, not just the 3 seeded ones)
 -- Client decision 2026-08-27: DMs yes; custom channels yes, admin-only to
--- create. Not numbered for apply yet — additive ALTER, doesn't touch the
--- live conversations/threads/messages data already in place.
+-- create. Additive ALTER — doesn't touch the live conversations/threads/
+-- messages data already in place.
 -- =====================================================================
 
 alter table public.conversations drop constraint conversations_kind_shape;
