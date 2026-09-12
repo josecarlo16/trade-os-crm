@@ -23,6 +23,7 @@ interface IntegrationConfig {
   config: {
     api_url?: string;
     webhook_enabled?: boolean;
+    webhook_secret?: string;
     team_id?: string;
   };
   is_active: boolean;
@@ -61,6 +62,7 @@ interface ProjectMedia {
 export default function WorkEdgeProjects() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('projects');
+  const [showSecret, setShowSecret] = useState(false);
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['integration_config', 'workedge'],
@@ -134,6 +136,30 @@ export default function WorkEdgeProjects() {
       toast.success('Configuration updated');
     },
     onError: (error) => toast.error('Failed to update: ' + error.message)
+  });
+
+  const regenerateSecretMutation = useMutation({
+    mutationFn: async () => {
+      // 32 random bytes, hex-encoded — this is what WorkEdge signs each
+      // webhook payload with (see resolveTenantFromSignature in
+      // supabase/functions/workedge-webhook/index.ts), so it must match
+      // exactly what gets entered into WorkEdge's webhook settings.
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      const secret = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+      const { error } = await supabase
+        .from('integration_configs')
+        .update({ config: { ...config?.config, webhook_secret: secret } })
+        .eq('integration_name', 'workedge');
+      if (error) throw error;
+      return secret;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integration_config', 'workedge'] });
+      setShowSecret(true);
+      toast.success('New webhook secret generated — copy it into WorkEdge now, it will be masked after you leave this page');
+    },
+    onError: (error) => toast.error('Failed to generate secret: ' + error.message)
   });
 
   const syncProjectMutation = useMutation({
@@ -562,12 +588,49 @@ export default function WorkEdgeProjects() {
                     </div>
                     <Switch
                       checked={config?.config?.webhook_enabled}
-                      onCheckedChange={(checked) => 
-                        updateConfigMutation.mutate({ 
-                          config: { ...config?.config, webhook_enabled: checked } 
+                      onCheckedChange={(checked) =>
+                        updateConfigMutation.mutate({
+                          config: { ...config?.config, webhook_enabled: checked }
                         })
                       }
                     />
+                  </div>
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Webhook Secret</Label>
+                    <p className="text-sm text-muted-foreground">
+                      WorkEdge signs every webhook with this secret (HMAC-SHA256) so we can verify it came from your account. Paste it into WorkEdge's webhook settings alongside the URL above.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={
+                          !config?.config?.webhook_secret
+                            ? ''
+                            : showSecret
+                              ? config.config.webhook_secret
+                              : '•'.repeat(48)
+                        }
+                        readOnly
+                        placeholder="No secret generated yet"
+                        className="font-mono text-sm"
+                      />
+                      {config?.config?.webhook_secret && (
+                        <Button variant="outline" onClick={() => setShowSecret((s) => !s)}>
+                          {showSecret ? 'Hide' : 'Show'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => regenerateSecretMutation.mutate()}
+                        disabled={regenerateSecretMutation.isPending}
+                      >
+                        {config?.config?.webhook_secret ? 'Regenerate' : 'Generate'}
+                      </Button>
+                    </div>
+                    {config?.config?.webhook_secret && (
+                      <p className="text-xs text-amber-600">
+                        Regenerating invalidates the old secret — update it in WorkEdge too, or webhooks will start failing signature checks.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

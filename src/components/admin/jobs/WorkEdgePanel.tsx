@@ -262,6 +262,17 @@ export function WorkEdgePanel({ jobId, workedgeProjectId, jobNumber, jobTitle }:
             Project: {[jobNumber, jobTitle].filter(Boolean).join(' - ')}
           </p>
         )}
+        {config?.config?.webhook_enabled ? (
+          <Badge variant="outline" className="mt-1 gap-1 text-emerald-600 border-emerald-600/30 w-fit">
+            <RefreshCw className="h-3 w-3" />
+            Auto-syncing from WorkEdge
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="mt-1 gap-1 text-amber-600 border-amber-600/30 w-fit">
+            <AlertCircle className="h-3 w-3" />
+            Manual sync only — enable webhooks in WorkEdge settings for real-time updates
+          </Badge>
+        )}
       </CardHeader>
       <CardContent>
         {mediaLoading ? (
@@ -284,7 +295,7 @@ export function WorkEdgePanel({ jobId, workedgeProjectId, jobNumber, jobTitle }:
                 disabled={syncMediaMutation.isPending}
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Sync from WorkEdge
+                {config?.config?.webhook_enabled ? 'Refresh now' : 'Sync from WorkEdge'}
               </Button>
             )}
             <Button
