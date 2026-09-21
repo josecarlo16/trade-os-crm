@@ -5215,6 +5215,7 @@ export type Database = {
           system_price: number | null
           system_type: string
           thermostat_model: string | null
+          tenant_id: string
           thermostat_price: number | null
           tonnage: number | null
           updated_at: string
@@ -5250,6 +5251,7 @@ export type Database = {
           system_name: string
           system_price?: number | null
           system_type: string
+          tenant_id?: string
           thermostat_model?: string | null
           thermostat_price?: number | null
           tonnage?: number | null
@@ -5286,12 +5288,117 @@ export type Database = {
           system_name?: string
           system_price?: number | null
           system_type?: string
+          tenant_id?: string
           thermostat_model?: string | null
           thermostat_price?: number | null
           tonnage?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "equipment_systems_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_system_price_history: {
+        Row: {
+          changed_at: string
+          created_by: string | null
+          equipment_id: string
+          id: string
+          notes: string | null
+          price: number
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          changed_at?: string
+          created_by?: string | null
+          equipment_id: string
+          id?: string
+          notes?: string | null
+          price: number
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          changed_at?: string
+          created_by?: string | null
+          equipment_id?: string
+          id?: string
+          notes?: string | null
+          price?: number
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_system_price_history_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_systems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_system_price_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      individual_equipment_price_history: {
+        Row: {
+          changed_at: string
+          created_by: string | null
+          equipment_id: string
+          id: string
+          notes: string | null
+          price: number
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          changed_at?: string
+          created_by?: string | null
+          equipment_id: string
+          id?: string
+          notes?: string | null
+          price: number
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          changed_at?: string
+          created_by?: string | null
+          equipment_id?: string
+          id?: string
+          notes?: string | null
+          price?: number
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "individual_equipment_price_history_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "individual_equipment_pricing"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "individual_equipment_price_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       estimate_line_items: {
         Row: {

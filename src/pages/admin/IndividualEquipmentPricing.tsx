@@ -70,6 +70,22 @@ interface FormData {
 
 const emptyForm: FormData = { brand: '', model_number: '', type: 'Air Handler', size: '', price: '', notes: '', is_active: true };
 
+interface PriceHistoryEntry {
+  id: string;
+  price: number;
+  source: 'manual' | 'import';
+  changed_at: string;
+  notes: string | null;
+}
+
+interface ImportPreviewRow {
+  data: Partial<EquipmentRow>;
+  existing: EquipmentRow | null;
+}
+
+const matchKey = (brand: string, model_number: string, size: string) =>
+  `${brand.trim().toLowerCase()}|${model_number.trim().toLowerCase()}|${(size || '').trim().toLowerCase()}`;
+
 export default function AdminIndividualEquipmentPricing() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
@@ -90,8 +106,24 @@ export default function AdminIndividualEquipmentPricing() {
   const [importRows, setImportRows] = useState<Partial<EquipmentRow>[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [docsSheetFor, setDocsSheetFor] = useState<EquipmentRow | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreviewRow[] | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const { data: docMeta } = useEquipmentDocumentCounts('individual_equipment');
+
+  const { data: priceHistory = [] } = useQuery({
+    queryKey: ['individual-equipment-price-history', editingId],
+    enabled: !!editingId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('individual_equipment_price_history')
+        .select('id, price, source, changed_at, notes')
+        .eq('equipment_id', editingId!)
+        .order('changed_at', { ascending: false });
+      if (error) throw error;
+      return data as PriceHistoryEntry[];
+    },
+  });
 
   const { data: equipment = [], isLoading } = useQuery({
     queryKey: ['individual-equipment-pricing'],
@@ -270,13 +302,46 @@ export default function AdminIndividualEquipmentPricing() {
 
   const confirmImport = async () => {
     if (!importRows.length) return;
-    const { error } = await supabase.from('individual_equipment_pricing').insert(importRows as any);
-    if (error) { toast({ title: 'Import failed', description: error.message, variant: 'destructive' }); return; }
-    qc.invalidateQueries({ queryKey: ['individual-equipment-pricing'] });
+    const existingByKey = new Map(equipment.map(r => [matchKey(r.brand, r.model_number, r.size), r]));
+    const preview: ImportPreviewRow[] = importRows.map(row => ({
+      data: row,
+      existing: existingByKey.get(matchKey(row.brand || '', row.model_number || '', row.size || '')) ?? null,
+    }));
     setImportOpen(false);
-    setImportRows([]);
-    setImportErrors([]);
-    toast({ title: `${importRows.length} items imported` });
+    setImportPreview(preview);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    setIsImporting(true);
+    try {
+      const toUpdate = importPreview.filter(r => r.existing);
+      const toInsert = importPreview.filter(r => !r.existing).map(r => r.data);
+
+      for (const row of toUpdate) {
+        const { error } = await supabase
+          .from('individual_equipment_pricing')
+          .update({ price: row.data.price, is_active: row.data.is_active ?? true })
+          .eq('id', row.existing!.id);
+        if (error) throw error;
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('individual_equipment_pricing').insert(toInsert as any);
+        if (error) throw error;
+      }
+
+      qc.invalidateQueries({ queryKey: ['individual-equipment-pricing'] });
+      qc.invalidateQueries({ queryKey: ['individual-equipment-price-history'] });
+      toast({ title: `Updated ${toUpdate.length} and added ${toInsert.length} items` });
+      setImportPreview(null);
+      setImportRows([]);
+      setImportErrors([]);
+    } catch (error: any) {
+      toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -458,6 +523,7 @@ export default function AdminIndividualEquipmentPricing() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="history" disabled={!editingId}>Price History</TabsTrigger>
             </TabsList>
             <TabsContent value="details" className="space-y-4">
               <div>
@@ -513,6 +579,38 @@ export default function AdminIndividualEquipmentPricing() {
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   Save the equipment first to attach documents.
                 </p>
+              )}
+            </TabsContent>
+            <TabsContent value="history">
+              {priceHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No price changes recorded yet.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead>Source</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {priceHistory.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{new Date(entry.changed_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${Number(entry.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={entry.source === 'import' ? 'secondary' : 'outline'} className="capitalize">
+                            {entry.source}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </TabsContent>
           </Tabs>
@@ -590,8 +688,64 @@ export default function AdminIndividualEquipmentPricing() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setImportOpen(false); setImportRows([]); setImportErrors([]); }}>Cancel</Button>
-            <Button onClick={confirmImport} disabled={importRows.length === 0}>Import {importRows.length} Items</Button>
+            <Button onClick={confirmImport} disabled={importRows.length === 0}>Review {importRows.length} Items</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Preview */}
+      <Dialog open={!!importPreview} onOpenChange={(o) => !o && setImportPreview(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review Price Sheet Import</DialogTitle>
+            <DialogDescription>
+              Matches on Brand + Model # + Size. Matched rows update the price; unmatched rows are added as new.
+            </DialogDescription>
+          </DialogHeader>
+          {importPreview && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {importPreview.filter(r => r.existing).length} existing items will have prices updated,{' '}
+                {importPreview.filter(r => !r.existing).length} new items will be added.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Brand</TableHead>
+                    <TableHead>Model #</TableHead>
+                    <TableHead>Change</TableHead>
+                    <TableHead className="text-right">Current Price</TableHead>
+                    <TableHead className="text-right">New Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importPreview.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{row.data.brand}</TableCell>
+                      <TableCell className="font-mono text-sm">{row.data.model_number}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.existing ? 'secondary' : 'default'}>
+                          {row.existing ? 'Update' : 'New'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.existing ? `$${Number(row.existing.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${Number(row.data.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportPreview(null)}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting}>
+                  {isImporting ? 'Importing...' : `Confirm Import (${importPreview.length})`}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </AdminLayout>

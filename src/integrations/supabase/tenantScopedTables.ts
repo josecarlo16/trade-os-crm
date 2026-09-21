@@ -27,6 +27,8 @@ export const TENANT_SCOPED_TABLE_LIST = [
   'estimates', 'estimate_line_items', 'estimate_templates',
   'estimate_template_items', 'estimate_versions', 'labor_rates',
   'price_books', 'financing_options', 'individual_equipment_pricing',
+  'equipment_systems', 'equipment_system_price_history',
+  'individual_equipment_price_history',
   // comms / marketing ops
   'crm_email_log', 'crm_email_templates', 'email_signatures',
   'crm_campaign_tags', 'lead_sources', 'form_source_tags',

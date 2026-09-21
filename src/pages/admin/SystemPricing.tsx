@@ -68,6 +68,19 @@ interface PriceBook {
   uploaded_by: string | null;
 }
 
+interface PriceHistoryEntry {
+  id: string;
+  price: number;
+  source: 'manual' | 'import';
+  changed_at: string;
+  notes: string | null;
+}
+
+interface ImportPreviewRow {
+  data: SystemFormData;
+  existing: EquipmentSystem | null;
+}
+
 type SystemFormData = Omit<EquipmentSystem, 'id' | 'created_at' | 'updated_at' | 'furnace_air_handler_model' | 'furnace_air_handler_price' | 'furnace_air_handler_size'>;
 
 const defaultFormData: SystemFormData = {
@@ -110,6 +123,22 @@ const SystemPricing = () => {
   const [formData, setFormData] = useState<SystemFormData>(defaultFormData);
   const [docsSheetFor, setDocsSheetFor] = useState<EquipmentSystem | null>(null);
   const { data: docMeta } = useEquipmentDocumentCounts('equipment_system');
+  const [importPreview, setImportPreview] = useState<ImportPreviewRow[] | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const { data: priceHistory = [] } = useQuery({
+    queryKey: ['equipment-system-price-history', editingSystem?.id],
+    enabled: !!editingSystem,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('equipment_system_price_history')
+        .select('id, price, source, changed_at, notes')
+        .eq('equipment_id', editingSystem!.id)
+        .order('changed_at', { ascending: false });
+      if (error) throw error;
+      return data as PriceHistoryEntry[];
+    },
+  });
 
   // Auto-calculate system price based on heating source
   useEffect(() => {
@@ -540,26 +569,68 @@ const SystemPricing = () => {
 
         // Filter out invalid entries
         const validSystems = systems.filter(s => s.system_name);
-        
+
         if (validSystems.length === 0) {
           toast.error('No valid systems found in the file');
           return;
         }
 
-        const { error } = await supabase
+        // Match against existing systems by name so updates overwrite price
+        // instead of creating duplicates — a price sheet is usually a mix of
+        // "update this product's price" and "here's a new product".
+        const names = validSystems.map(s => s.system_name);
+        const { data: existingMatches, error: matchError } = await supabase
           .from('equipment_systems')
-          .insert(validSystems);
+          .select('*')
+          .in('system_name', names);
+        if (matchError) throw matchError;
 
-        if (error) throw error;
+        const existingByName = new Map((existingMatches as EquipmentSystem[]).map(s => [s.system_name.trim().toLowerCase(), s]));
+        const preview: ImportPreviewRow[] = validSystems.map(data => ({
+          data,
+          existing: existingByName.get(data.system_name.trim().toLowerCase()) ?? null,
+        }));
 
-        queryClient.invalidateQueries({ queryKey: ['equipment-systems'] });
-        toast.success(`Imported ${validSystems.length} systems successfully`);
+        setImportPreview(preview);
       } catch (error: any) {
         toast.error(`Import error: ${error.message}`);
       }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    setIsImporting(true);
+    try {
+      const toUpdate = importPreview.filter(r => r.existing);
+      const toInsert = importPreview.filter(r => !r.existing).map(r => r.data);
+
+      for (const row of toUpdate) {
+        const { error } = await supabase
+          .from('equipment_systems')
+          .update(row.data)
+          .eq('id', row.existing!.id);
+        if (error) throw error;
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase
+          .from('equipment_systems')
+          .insert(toInsert);
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['equipment-systems'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-system-price-history'] });
+      toast.success(`Updated ${toUpdate.length} and added ${toInsert.length} systems`);
+      setImportPreview(null);
+    } catch (error: any) {
+      toast.error(`Import error: ${error.message}`);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleUploadPriceBook = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -694,6 +765,9 @@ const SystemPricing = () => {
                               {docMeta!.counts.get(editingSystem.id)}
                             </Badge>
                           )}
+                        </TabsTrigger>
+                        <TabsTrigger value="history" disabled={!editingSystem}>
+                          Price History
                         </TabsTrigger>
                       </TabsList>
                       <TabsContent value="details">
@@ -1073,6 +1147,36 @@ const SystemPricing = () => {
                           </p>
                         )}
                       </TabsContent>
+                      <TabsContent value="history">
+                        {priceHistory.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-8 text-center">
+                            No price changes recorded yet.
+                          </p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Price</TableHead>
+                                <TableHead>Source</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {priceHistory.map((entry) => (
+                                <TableRow key={entry.id}>
+                                  <TableCell>{new Date(entry.changed_at).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatPrice(entry.price)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={entry.source === 'import' ? 'secondary' : 'outline'} className="capitalize">
+                                      {entry.source}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </TabsContent>
                     </Tabs>
                   </DialogContent>
                 </Dialog>
@@ -1319,6 +1423,57 @@ const SystemPricing = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Import Preview */}
+      <Dialog open={!!importPreview} onOpenChange={(o) => !o && setImportPreview(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review Price Sheet Import</DialogTitle>
+          </DialogHeader>
+          {importPreview && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {importPreview.filter(r => r.existing).length} existing systems will have prices updated,{' '}
+                {importPreview.filter(r => !r.existing).length} new systems will be added.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>System Name</TableHead>
+                    <TableHead>Change</TableHead>
+                    <TableHead className="text-right">Current Price</TableHead>
+                    <TableHead className="text-right">New Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importPreview.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{row.data.system_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.existing ? 'secondary' : 'default'}>
+                          {row.existing ? 'Update' : 'New'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {row.existing ? formatPrice(row.existing.system_price) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatPrice(row.data.system_price)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportPreview(null)}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting}>
+                  {isImporting ? 'Importing...' : `Confirm Import (${importPreview.length})`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
