@@ -100,6 +100,12 @@ verify_jwt = true
 [functions.verify-live-pages]
 verify_jwt = false
 
+[functions.lovable-sync]
+verify_jwt = false
+
+[functions.smart-price-sheet-import]
+verify_jwt = false
+
 
 
 

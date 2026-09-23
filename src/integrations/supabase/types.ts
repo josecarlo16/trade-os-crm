@@ -148,6 +148,7 @@ export type Database = {
           id: string
           is_dismissed: boolean
           is_read: boolean
+          legacy_sync_source_id: string | null
           link_url: string | null
           message: string | null
           related_entity_id: string | null
@@ -164,6 +165,7 @@ export type Database = {
           id?: string
           is_dismissed?: boolean
           is_read?: boolean
+          legacy_sync_source_id?: string | null
           link_url?: string | null
           message?: string | null
           related_entity_id?: string | null
@@ -180,6 +182,7 @@ export type Database = {
           id?: string
           is_dismissed?: boolean
           is_read?: boolean
+          legacy_sync_source_id?: string | null
           link_url?: string | null
           message?: string | null
           related_entity_id?: string | null
@@ -1846,6 +1849,7 @@ export type Database = {
           id: string
           last_name: string | null
           lead_source: string | null
+          legacy_sync_source_id: string | null
           notes: string | null
           phone: string | null
           preferred_contact_method: string | null
@@ -1876,6 +1880,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           lead_source?: string | null
+          legacy_sync_source_id?: string | null
           notes?: string | null
           phone?: string | null
           preferred_contact_method?: string | null
@@ -1906,6 +1911,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           lead_source?: string | null
+          legacy_sync_source_id?: string | null
           notes?: string | null
           phone?: string | null
           preferred_contact_method?: string | null
@@ -2653,6 +2659,7 @@ export type Database = {
           internal_notes: string | null
           job_number: string
           job_type_id: string
+          legacy_sync_source_id: string | null
           location_id: string | null
           payment_status: string | null
           priority: string | null
@@ -2685,6 +2692,7 @@ export type Database = {
           internal_notes?: string | null
           job_number: string
           job_type_id: string
+          legacy_sync_source_id?: string | null
           location_id?: string | null
           payment_status?: string | null
           priority?: string | null
@@ -2717,6 +2725,7 @@ export type Database = {
           internal_notes?: string | null
           job_number?: string
           job_type_id?: string
+          legacy_sync_source_id?: string | null
           location_id?: string | null
           payment_status?: string | null
           priority?: string | null
@@ -7177,6 +7186,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      legacy_sync_state: {
+        Row: {
+          last_synced_at: string
+          source_table: string
+          updated_at: string
+        }
+        Insert: {
+          last_synced_at?: string
+          source_table: string
+          updated_at?: string
+        }
+        Update: {
+          last_synced_at?: string
+          source_table?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       lead_sources: {
         Row: {

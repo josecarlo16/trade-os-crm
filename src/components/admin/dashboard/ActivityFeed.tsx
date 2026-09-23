@@ -174,8 +174,8 @@ export const ActivityFeed = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Activity Feed</CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="h-[300px] px-6">
+      <CardContent className="p-0 h-full">
+        <ScrollArea className="h-full px-6">
           {activities?.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No recent activity</p>
           ) : (

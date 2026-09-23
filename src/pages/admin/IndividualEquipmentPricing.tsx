@@ -39,7 +39,7 @@ const TYPE_COLORS: Record<string, string> = {
   'Other': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 type SortField = 'brand' | 'model_number' | 'type' | 'size' | 'price' | 'is_active';
 type SortDir = 'asc' | 'desc';
@@ -93,7 +93,7 @@ export default function AdminIndividualEquipmentPricing() {
   const [brandFilter, setBrandFilter] = useState('all');
   const [activeOnly, setActiveOnly] = useState(true);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(25);
+  const [pageSize, setPageSize] = useState<number>(20);
   const [sortField, setSortField] = useState<SortField>('brand');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -108,6 +108,7 @@ export default function AdminIndividualEquipmentPricing() {
   const [docsSheetFor, setDocsSheetFor] = useState<EquipmentRow | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isSmartImporting, setIsSmartImporting] = useState(false);
 
   const { data: docMeta } = useEquipmentDocumentCounts('individual_equipment');
 
@@ -300,22 +301,113 @@ export default function AdminIndividualEquipmentPricing() {
     reader.readAsText(file);
   };
 
-  const confirmImport = async () => {
-    if (!importRows.length) return;
+  // Shared by the CSV importer and the Mitsubishi PDF importer: match
+  // candidate rows against existing equipment by brand+model+size.
+  const buildImportPreview = (rows: Partial<EquipmentRow>[]) => {
     const existingByKey = new Map(equipment.map(r => [matchKey(r.brand, r.model_number, r.size), r]));
-    const preview: ImportPreviewRow[] = importRows.map(row => ({
+    const preview: ImportPreviewRow[] = rows.map(row => ({
       data: row,
       existing: existingByKey.get(matchKey(row.brand || '', row.model_number || '', row.size || '')) ?? null,
     }));
-    setImportOpen(false);
     setImportPreview(preview);
+  };
+
+  const confirmImport = async () => {
+    if (!importRows.length) return;
+    setImportOpen(false);
+    buildImportPreview(importRows);
+  };
+
+  const handleImportMitsubishiPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    try {
+      const { parseMitsubishiPdf } = await import('@/lib/mitsubishiPdfParser');
+      const { items, skippedSections } = await parseMitsubishiPdf(file);
+
+      if (items.length === 0) {
+        toast({ title: 'No recognizable item pricing rows found in this PDF', variant: 'destructive' });
+        return;
+      }
+
+      buildImportPreview(items);
+
+      if (skippedSections.length > 0) {
+        toast({
+          title: 'Some sections were skipped',
+          description: `${skippedSections.length} section(s) of this PDF aren't supported yet (multi-zone / accessories) and were not imported.`,
+        });
+      }
+    } catch (error: any) {
+      toast({ title: 'PDF import error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  // General fallback for any manufacturer's PDF: an AI model reads the
+  // extracted text and returns structured rows. Slower and not free, but
+  // works across vendors instead of one known layout.
+  const handleSmartImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setIsSmartImporting(true);
+    try {
+      const { extractPdfLines } = await import('@/lib/pdfText');
+      const lines = await extractPdfLines(file);
+      const fullText = lines.join('\n');
+
+      const CHUNK_SIZE = 10000;
+      const chunks: string[] = [];
+      for (let i = 0; i < fullText.length; i += CHUNK_SIZE) {
+        chunks.push(fullText.slice(i, i + CHUNK_SIZE));
+      }
+
+      const allItems: any[] = [];
+      const warnings: string[] = [];
+
+      for (const chunk of chunks) {
+        const { data, error } = await supabase.functions.invoke('smart-price-sheet-import', {
+          body: { pdf_text: chunk },
+        });
+        if (error) throw error;
+        if (data?.items?.length) allItems.push(...data.items);
+        if (data?.warning) warnings.push(data.warning);
+      }
+
+      if (allItems.length === 0) {
+        toast({ title: 'No item pricing rows found in this PDF', variant: 'destructive' });
+        return;
+      }
+
+      const rows: Partial<EquipmentRow>[] = allItems.map((row: any) => ({
+        brand: row.brand,
+        model_number: row.model_number,
+        type: row.type || 'Other',
+        size: '',
+        price: row.price ?? 0,
+        is_active: true,
+      }));
+
+      buildImportPreview(rows);
+
+      if (warnings.length > 0) {
+        toast({ title: 'Some content was unclear', description: warnings[0] });
+      }
+    } catch (error: any) {
+      toast({ title: 'Smart import error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSmartImporting(false);
+    }
   };
 
   const handleConfirmImport = async () => {
     if (!importPreview) return;
     setIsImporting(true);
     try {
-      const toUpdate = importPreview.filter(r => r.existing);
+      const toUpdate = importPreview.filter(r => r.existing && Number(r.existing.price) !== Number(r.data.price));
       const toInsert = importPreview.filter(r => !r.existing).map(r => r.data);
 
       for (const row of toUpdate) {
@@ -331,9 +423,10 @@ export default function AdminIndividualEquipmentPricing() {
         if (error) throw error;
       }
 
+      const skipped = importPreview.length - toUpdate.length - toInsert.length;
       qc.invalidateQueries({ queryKey: ['individual-equipment-pricing'] });
       qc.invalidateQueries({ queryKey: ['individual-equipment-price-history'] });
-      toast({ title: `Updated ${toUpdate.length} and added ${toInsert.length} items` });
+      toast({ title: `Updated ${toUpdate.length}, added ${toInsert.length}${skipped > 0 ? `, skipped ${skipped} already present` : ''}` });
       setImportPreview(null);
       setImportRows([]);
       setImportErrors([]);
@@ -357,6 +450,29 @@ export default function AdminIndividualEquipmentPricing() {
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4 mr-1" /> Import CSV
             </Button>
+            <label>
+              <Button variant="outline" size="sm" asChild>
+                <span>
+                  <Upload className="h-4 w-4 mr-1" /> Import Mitsubishi PDF
+                </span>
+              </Button>
+              <input type="file" accept=".pdf" className="hidden" onChange={handleImportMitsubishiPdf} />
+            </label>
+            <label>
+              <Button variant="outline" size="sm" disabled={isSmartImporting} asChild>
+                <span>
+                  <Upload className="h-4 w-4 mr-1" />
+                  {isSmartImporting ? 'Reading PDF...' : 'Smart Import PDF (Any Brand)'}
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                disabled={isSmartImporting}
+                onChange={handleSmartImportPdf}
+              />
+            </label>
             <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="h-4 w-4 mr-1" /> Export CSV
             </Button>
@@ -705,7 +821,8 @@ export default function AdminIndividualEquipmentPricing() {
           {importPreview && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                {importPreview.filter(r => r.existing).length} existing items will have prices updated,{' '}
+                {importPreview.filter(r => r.existing && Number(r.existing.price) !== Number(r.data.price)).length} existing items will have prices updated,{' '}
+                {importPreview.filter(r => r.existing && Number(r.existing.price) === Number(r.data.price)).length} already exist with no change,{' '}
                 {importPreview.filter(r => !r.existing).length} new items will be added.
               </p>
               <Table>
@@ -719,29 +836,37 @@ export default function AdminIndividualEquipmentPricing() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {importPreview.map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{row.data.brand}</TableCell>
-                      <TableCell className="font-mono text-sm">{row.data.model_number}</TableCell>
-                      <TableCell>
-                        <Badge variant={row.existing ? 'secondary' : 'default'}>
-                          {row.existing ? 'Update' : 'New'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.existing ? `$${Number(row.existing.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${Number(row.data.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {importPreview.map((row, i) => {
+                    const unchanged = row.existing && Number(row.existing.price) === Number(row.data.price);
+                    return (
+                      <TableRow key={i} className={unchanged ? 'opacity-60' : ''}>
+                        <TableCell className="font-medium">{row.data.brand}</TableCell>
+                        <TableCell className="font-mono text-sm">{row.data.model_number}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={!row.existing ? 'default' : unchanged ? 'outline' : 'secondary'}
+                            className={unchanged ? 'border-amber-400 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950' : ''}
+                          >
+                            {!row.existing ? 'New' : unchanged ? 'Already Present — Skipped' : 'Update'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.existing ? `$${Number(row.existing.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${Number(row.data.price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setImportPreview(null)}>Cancel</Button>
                 <Button onClick={handleConfirmImport} disabled={isImporting}>
-                  {isImporting ? 'Importing...' : `Confirm Import (${importPreview.length})`}
+                  {isImporting
+                    ? 'Importing...'
+                    : `Confirm Import (${importPreview.filter(r => !r.existing || Number(r.existing.price) !== Number(r.data.price)).length})`}
                 </Button>
               </div>
             </div>

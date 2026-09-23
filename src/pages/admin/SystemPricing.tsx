@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Plus, Search, Download, Upload, Pencil, Trash2, FileText, FileSpreadsheet, AlertTriangle, Copy, Paperclip } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -125,6 +126,10 @@ const SystemPricing = () => {
   const { data: docMeta } = useEquipmentDocumentCounts('equipment_system');
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isSmartImporting, setIsSmartImporting] = useState(false);
+  const [selectedSystemIds, setSelectedSystemIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const { data: priceHistory = [] } = useQuery({
     queryKey: ['equipment-system-price-history', editingSystem?.id],
@@ -190,6 +195,13 @@ const SystemPricing = () => {
     },
   });
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, typeFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(systems.length / pageSize));
+  const paginatedSystems = systems.slice((page - 1) * pageSize, page * pageSize);
+
   // Fetch price books
   const { data: priceBooks = [], isLoading: priceBooksLoading } = useQuery({
     queryKey: ['price-books'],
@@ -245,6 +257,25 @@ const SystemPricing = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment-systems'] });
       toast.success('System deleted successfully');
+    },
+    onError: (error) => {
+      toast.error(`Error: ${error.message}`);
+    },
+  });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('equipment_systems')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: (_data, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['equipment-systems'] });
+      toast.success(`${ids.length} system${ids.length === 1 ? '' : 's'} deleted successfully`);
+      setSelectedSystemIds(new Set());
     },
     onError: (error) => {
       toast.error(`Error: ${error.message}`);
@@ -575,23 +606,7 @@ const SystemPricing = () => {
           return;
         }
 
-        // Match against existing systems by name so updates overwrite price
-        // instead of creating duplicates — a price sheet is usually a mix of
-        // "update this product's price" and "here's a new product".
-        const names = validSystems.map(s => s.system_name);
-        const { data: existingMatches, error: matchError } = await supabase
-          .from('equipment_systems')
-          .select('*')
-          .in('system_name', names);
-        if (matchError) throw matchError;
-
-        const existingByName = new Map((existingMatches as EquipmentSystem[]).map(s => [s.system_name.trim().toLowerCase(), s]));
-        const preview: ImportPreviewRow[] = validSystems.map(data => ({
-          data,
-          existing: existingByName.get(data.system_name.trim().toLowerCase()) ?? null,
-        }));
-
-        setImportPreview(preview);
+        await buildImportPreview(validSystems);
       } catch (error: any) {
         toast.error(`Import error: ${error.message}`);
       }
@@ -600,11 +615,124 @@ const SystemPricing = () => {
     e.target.value = '';
   };
 
+  // Shared by both the Excel importer above and the Mitsubishi PDF importer
+  // below: match candidate rows against existing systems by name so updates
+  // overwrite price instead of creating duplicates — a price sheet is usually
+  // a mix of "update this product's price" and "here's a new product".
+  const buildImportPreview = async (candidates: SystemFormData[]) => {
+    const names = candidates.map(s => s.system_name);
+    const { data: existingMatches, error: matchError } = await supabase
+      .from('equipment_systems')
+      .select('*')
+      .in('system_name', names);
+    if (matchError) throw matchError;
+
+    const existingByName = new Map((existingMatches as EquipmentSystem[]).map(s => [s.system_name.trim().toLowerCase(), s]));
+    const preview: ImportPreviewRow[] = candidates.map(data => ({
+      data,
+      existing: existingByName.get(data.system_name.trim().toLowerCase()) ?? null,
+    }));
+
+    setImportPreview(preview);
+  };
+
+  const handleImportMitsubishiPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    try {
+      const { parseMitsubishiPdf } = await import('@/lib/mitsubishiPdfParser');
+      const { systems: parsedSystems, skippedSections } = await parseMitsubishiPdf(file);
+
+      if (parsedSystems.length === 0) {
+        toast.error('No recognizable system pricing rows found in this PDF');
+        return;
+      }
+
+      const candidates: SystemFormData[] = parsedSystems.map(row => ({ ...defaultFormData, ...row }));
+      await buildImportPreview(candidates);
+
+      if (skippedSections.length > 0) {
+        toast.warning(
+          `${skippedSections.length} section(s) of this PDF aren't supported yet and were skipped (multi-zone / accessories). Only single-zone system pricing was imported.`
+        );
+      }
+    } catch (error: any) {
+      toast.error(`PDF import error: ${error.message}`);
+    }
+  };
+
+  // General fallback for any manufacturer's PDF that doesn't have a
+  // hand-written parser: an AI model reads the extracted text and returns
+  // structured rows. Slower and not free, but works across vendors.
+  const handleSmartImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setIsSmartImporting(true);
+    try {
+      const { extractPdfLines } = await import('@/lib/pdfText');
+      const lines = await extractPdfLines(file);
+      const fullText = lines.join('\n');
+
+      // Chunk long PDFs so each AI call stays a reasonable size.
+      const CHUNK_SIZE = 10000;
+      const chunks: string[] = [];
+      for (let i = 0; i < fullText.length; i += CHUNK_SIZE) {
+        chunks.push(fullText.slice(i, i + CHUNK_SIZE));
+      }
+
+      const allSystems: any[] = [];
+      const warnings: string[] = [];
+
+      for (const chunk of chunks) {
+        const { data, error } = await supabase.functions.invoke('smart-price-sheet-import', {
+          body: { pdf_text: chunk },
+        });
+        if (error) throw error;
+        if (data?.systems?.length) allSystems.push(...data.systems);
+        if (data?.warning) warnings.push(data.warning);
+      }
+
+      if (allSystems.length === 0) {
+        toast.error('No system pricing rows found in this PDF');
+        return;
+      }
+
+      const candidates: SystemFormData[] = allSystems.map((row: any) => ({
+        ...defaultFormData,
+        system_name: row.system_name || `${row.indoor_model ?? '?'} / ${row.outdoor_model ?? '?'}`,
+        system_type: 'mini_split',
+        condenser_heat_pump_model: row.outdoor_model ?? null,
+        evap_coil_model: row.indoor_model ?? null,
+        capacity_btuh: row.capacity_btuh ?? null,
+        seer2: row.seer2 ?? null,
+        hspf2: row.hspf2 ?? null,
+        eer2: row.eer2 ?? null,
+        ahri_number: row.ahri_number ?? null,
+        system_price: row.price ?? null,
+        notes: row.notes ?? null,
+      }));
+
+      await buildImportPreview(candidates);
+
+      if (warnings.length > 0) {
+        toast.warning(warnings[0]);
+      }
+    } catch (error: any) {
+      toast.error(`Smart import error: ${error.message}`);
+    } finally {
+      setIsSmartImporting(false);
+    }
+  };
+
   const handleConfirmImport = async () => {
     if (!importPreview) return;
     setIsImporting(true);
     try {
-      const toUpdate = importPreview.filter(r => r.existing);
+      const toUpdate = importPreview.filter(r => r.existing && r.existing.system_price !== r.data.system_price);
       const toInsert = importPreview.filter(r => !r.existing).map(r => r.data);
 
       for (const row of toUpdate) {
@@ -622,9 +750,10 @@ const SystemPricing = () => {
         if (error) throw error;
       }
 
+      const skipped = importPreview.length - toUpdate.length - toInsert.length;
       queryClient.invalidateQueries({ queryKey: ['equipment-systems'] });
       queryClient.invalidateQueries({ queryKey: ['equipment-system-price-history'] });
-      toast.success(`Updated ${toUpdate.length} and added ${toInsert.length} systems`);
+      toast.success(`Updated ${toUpdate.length}, added ${toInsert.length}${skipped > 0 ? `, skipped ${skipped} already present` : ''}`);
       setImportPreview(null);
     } catch (error: any) {
       toast.error(`Import error: ${error.message}`);
@@ -741,6 +870,35 @@ const SystemPricing = () => {
                     accept=".xlsx,.xls"
                     className="hidden"
                     onChange={handleImportExcel}
+                  />
+                </label>
+                <label>
+                  <Button variant="outline" size="sm" asChild>
+                    <span>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Import Mitsubishi PDF
+                    </span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={handleImportMitsubishiPdf}
+                  />
+                </label>
+                <label>
+                  <Button variant="outline" size="sm" disabled={isSmartImporting} asChild>
+                    <span>
+                      <FileText className="h-4 w-4 mr-2" />
+                      {isSmartImporting ? 'Reading PDF...' : 'Smart Import PDF (Any Brand)'}
+                    </span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    disabled={isSmartImporting}
+                    onChange={handleSmartImportPdf}
                   />
                 </label>
                 <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -1183,11 +1341,54 @@ const SystemPricing = () => {
               </div>
             </div>
 
+            {/* Bulk actions bar */}
+            {selectedSystemIds.size > 0 && (
+              <div className="flex items-center justify-between rounded-md border bg-muted/50 px-4 py-2">
+                <span className="text-sm font-medium">
+                  {selectedSystemIds.size} system{selectedSystemIds.size === 1 ? '' : 's'} selected
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedSystemIds(new Set())}>
+                    Clear selection
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={bulkDeleteMutation.isPending}
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${selectedSystemIds.size} system${selectedSystemIds.size === 1 ? '' : 's'}?`)) {
+                        bulkDeleteMutation.mutate(Array.from(selectedSystemIds));
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete Selected'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Systems Table */}
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={paginatedSystems.length > 0 && paginatedSystems.every((s) => selectedSystemIds.has(s.id))}
+                        onCheckedChange={(checked) => {
+                          setSelectedSystemIds((prev) => {
+                            const next = new Set(prev);
+                            for (const s of paginatedSystems) {
+                              if (checked) next.add(s.id);
+                              else next.delete(s.id);
+                            }
+                            return next;
+                          });
+                        }}
+                        aria-label="Select all on this page"
+                      />
+                    </TableHead>
                     <TableHead>System Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Tonnage</TableHead>
@@ -1200,19 +1401,33 @@ const SystemPricing = () => {
                 <TableBody>
                   {systemsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Loading...
                       </TableCell>
                     </TableRow>
                   ) : systems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No systems found. Add your first system or import from Excel.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    systems.map((system) => (
+                    paginatedSystems.map((system) => (
                       <TableRow key={system.id} className={system.needs_migration_review ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedSystemIds.has(system.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedSystemIds((prev) => {
+                                const next = new Set(prev);
+                                if (checked) next.add(system.id);
+                                else next.delete(system.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={`Select ${system.system_name}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             {system.system_name}
@@ -1315,6 +1530,50 @@ const SystemPricing = () => {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {systems.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Rows per page</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                    <SelectTrigger className="w-[80px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span>
+                    {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, systems.length)} of {systems.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="pricebooks" className="space-y-4">
@@ -1433,7 +1692,8 @@ const SystemPricing = () => {
           {importPreview && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                {importPreview.filter(r => r.existing).length} existing systems will have prices updated,{' '}
+                {importPreview.filter(r => r.existing && r.existing.system_price !== r.data.system_price).length} existing systems will have prices updated,{' '}
+                {importPreview.filter(r => r.existing && r.existing.system_price === r.data.system_price).length} already exist with no change,{' '}
                 {importPreview.filter(r => !r.existing).length} new systems will be added.
               </p>
               <Table>
@@ -1446,28 +1706,36 @@ const SystemPricing = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {importPreview.map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{row.data.system_name}</TableCell>
-                      <TableCell>
-                        <Badge variant={row.existing ? 'secondary' : 'default'}>
-                          {row.existing ? 'Update' : 'New'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {row.existing ? formatPrice(row.existing.system_price) : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatPrice(row.data.system_price)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {importPreview.map((row, i) => {
+                    const unchanged = row.existing && row.existing.system_price === row.data.system_price;
+                    return (
+                      <TableRow key={i} className={unchanged ? 'opacity-60' : ''}>
+                        <TableCell className="font-medium">{row.data.system_name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={!row.existing ? 'default' : unchanged ? 'outline' : 'secondary'}
+                            className={unchanged ? 'border-amber-400 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950' : ''}
+                          >
+                            {!row.existing ? 'New' : unchanged ? 'Already Present — Skipped' : 'Update'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.existing ? formatPrice(row.existing.system_price) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatPrice(row.data.system_price)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setImportPreview(null)}>Cancel</Button>
                 <Button onClick={handleConfirmImport} disabled={isImporting}>
-                  {isImporting ? 'Importing...' : `Confirm Import (${importPreview.length})`}
+                  {isImporting
+                    ? 'Importing...'
+                    : `Confirm Import (${importPreview.filter(r => !r.existing || r.existing.system_price !== r.data.system_price).length})`}
                 </Button>
               </div>
             </div>
