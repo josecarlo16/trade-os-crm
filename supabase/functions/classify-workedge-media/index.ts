@@ -1,4 +1,4 @@
-// Phase 2: Batch classifier for WorkEdge media using Gemini vision via Lovable AI Gateway.
+// Phase 2: Batch classifier for WorkEdge media using xAI's grok-4.3 vision model.
 // Reads unclassified workedge_project_media rows, classifies each photo, extracts data plate
 // info, and routes data plates through upsert-equipment-page (dedupe enforced).
 //
@@ -159,7 +159,7 @@ async function callGeminiVision(
   apiKey: string,
 ): Promise<GeminiResponse | null> {
   const body = {
-    model: "google/gemini-2.5-flash",
+    model: "grok-4.3",
     messages: [
       {
         role: "user",
@@ -175,7 +175,7 @@ async function callGeminiVision(
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const resp = await fetch(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        "https://api.x.ai/v1/chat/completions",
         {
           method: "POST",
           headers: {
@@ -234,11 +234,11 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
 
-  if (!LOVABLE_API_KEY) {
+  if (!XAI_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
+      JSON.stringify({ error: "XAI_API_KEY is not configured" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -389,7 +389,7 @@ serve(async (req) => {
       continue;
     }
 
-    const result = await callGeminiVision(item.media_url, LOVABLE_API_KEY);
+    const result = await callGeminiVision(item.media_url, XAI_API_KEY);
 
     if (!result) {
       out.classified.failed++;

@@ -145,7 +145,7 @@ function ThreadView({ threadId, conversationId }: { threadId: string; conversati
   }, [threadId, queryClient]);
 
   return (
-    <div className="flex h-[480px] flex-col">
+    <div className="flex h-full flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {isLoading ? (
           <p className="text-sm text-tradeos-ink-3">Loading…</p>
@@ -434,16 +434,16 @@ function MessagesContent() {
   const active = conversations.find((c) => c.id === activeId);
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-      <Card className="bg-tradeos-surface border-tradeos-line">
-        <CardHeader className="flex flex-row items-center gap-2 border-b border-tradeos-line py-3">
+    <div className="grid h-[calc(100vh-220px)] min-h-[480px] grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+      <Card className="flex flex-col overflow-hidden bg-tradeos-surface border-tradeos-line">
+        <CardHeader className="flex flex-none flex-row items-center gap-2 border-b border-tradeos-line py-3">
           <CardTitle className="font-condensed text-sm font-bold uppercase tracking-wider text-tradeos-ink">Channels</CardTitle>
         </CardHeader>
-        <div className="flex items-center gap-1 border-b border-tradeos-line px-1 py-1">
+        <div className="flex flex-none items-center gap-1 border-b border-tradeos-line px-1 py-1">
           <NewMessageDialog onStarted={setActiveId} />
           {(isAdmin || isSuperAdmin) && <NewChannelDialog onCreated={setActiveId} />}
         </div>
-        <CardContent className="p-2">
+        <CardContent className="flex-1 overflow-y-auto p-2">
           <p className="px-2 py-1.5 text-[10.5px] font-semibold uppercase tracking-widest text-tradeos-ink-3">General</p>
           {seededConversations.map((c) => (
             <ChannelRow key={c.id} active={activeId === c.id} unread={unreadByConversation.get(c.id) ?? 0} onClick={() => setActiveId(c.id)} label={c.name} />
@@ -485,16 +485,16 @@ function MessagesContent() {
         </CardContent>
       </Card>
 
-      <Card className="bg-tradeos-surface border-tradeos-line">
+      <Card className="flex flex-col overflow-hidden bg-tradeos-surface border-tradeos-line">
         {active ? (
           <>
-            <CardHeader className="flex flex-row items-center gap-2 border-b border-tradeos-line py-3">
+            <CardHeader className="flex flex-none flex-row items-center gap-2 border-b border-tradeos-line py-3">
               <CardTitle className="font-condensed text-sm font-bold uppercase tracking-wider text-tradeos-ink">
                 {active.kind === 'job' ? `${active.crm_jobs?.job_number} — ${active.crm_jobs?.title}` : active.kind === 'dm' ? dmLabel(active.id) : active.name}
               </CardTitle>
               <Badge variant="outline" className="ml-auto border-tradeos-line-strong text-tradeos-ink-3">{active.kind}</Badge>
             </CardHeader>
-            <CardContent className="p-0">{thread ? <ThreadView threadId={thread.id} conversationId={active.id} /> : <p className="p-4 text-sm text-tradeos-ink-3">Loading thread…</p>}</CardContent>
+            <CardContent className="flex-1 overflow-hidden p-0">{thread ? <ThreadView threadId={thread.id} conversationId={active.id} /> : <p className="p-4 text-sm text-tradeos-ink-3">Loading thread…</p>}</CardContent>
           </>
         ) : (
           <CardContent className="py-16 text-center text-sm text-tradeos-ink-3">Pick a channel, DM, or job thread on the left.</CardContent>

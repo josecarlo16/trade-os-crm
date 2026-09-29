@@ -3,7 +3,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY')!
 
 interface MediaItem {
   id: string
@@ -16,8 +16,8 @@ Deno.serve(async (req) => {
   }
 
   const t0 = Date.now()
-  let provider = 'lovable'
-  let model = 'google/gemini-2.5-flash'
+  let provider = 'xai'
+  let model = 'grok-4.3'
 
   try {
     const body = await req.json().catch(() => ({}))
@@ -75,11 +75,11 @@ Rules:
 Source article (JSON):
 ${JSON.stringify(payload)}`
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
         model,

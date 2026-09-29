@@ -25,8 +25,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
+    if (!XAI_API_KEY) throw new Error("XAI_API_KEY not configured");
 
     // Download the image and convert to base64
     const imgResp = await fetch(imageUrl);
@@ -36,14 +36,14 @@ serve(async (req) => {
     const base64 = arrayBufferToBase64(imgBuffer);
     const dataUrl = `data:${contentType};base64,${base64}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${XAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "grok-4.3",
         messages: [
           {
             role: "system",
@@ -85,7 +85,7 @@ Do not mention people, customer names, or specific addresses. Focus on equipment
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("xAI API error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited, try again shortly." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -3,7 +3,7 @@ import { corsHeaders } from 'https://esm.sh/@supabase/supabase-js@2.95.0/cors'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY')!
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -69,15 +69,15 @@ ${emailHistory || 'No previous emails'}`
       ? `Draft an email based on this instruction: ${instruction}\n\nThread context: ${threadContext || 'New conversation'}`
       : `Draft a follow-up email based on the conversation thread.\n\nThread context: ${threadContext || 'New conversation'}`
 
-    // Call Lovable AI Gateway
-    const aiRes = await fetch('https://ai-gateway.lovable.dev/v1/chat/completions', {
+    // Call xAI
+    const aiRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'grok-4.3',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

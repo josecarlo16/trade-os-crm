@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
   const t0 = Date.now();
   let provider = 'xai';
-  let model = 'grok-3-mini';
+  let model = 'grok-4.3';
 
   try {
     const { pdf_text } = (await req.json().catch(() => ({}))) as { pdf_text?: string };

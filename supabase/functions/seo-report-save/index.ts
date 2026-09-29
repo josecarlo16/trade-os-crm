@@ -112,8 +112,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
+    if (!XAI_API_KEY) throw new Error("XAI_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -144,17 +144,17 @@ Deno.serve(async (req) => {
       }
     } catch (_e) { /* ignore */ }
 
-    // Extract metadata via Lovable AI gateway (uses fast model — this is a lightweight extraction task)
+    // Extract metadata via xAI (uses fast model — this is a lightweight extraction task)
     let meta: ParsedMeta;
     try {
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiRes = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${XAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "grok-4.3",
           messages: [
             { role: "system", content: META_SYSTEM },
             { role: "user", content: buildMetaPrompt(full_response) },

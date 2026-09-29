@@ -1,4 +1,4 @@
-// Bach SEO Analyst — Lovable AI powered analysis over page_seo data
+// Bach SEO Analyst — xAI powered analysis over page_seo data
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -8,9 +8,7 @@ const corsHeaders = {
 };
 
 const ALLOWED_MODELS = new Set([
-  "google/gemini-2.5-pro",
-  "openai/gpt-5",
-  "openai/gpt-5-mini",
+  "grok-4.3",
 ]);
 
 const SYSTEM_PROMPT = `You are Bach, the in-house SEO analyst for Truficient HVAC.
@@ -188,8 +186,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
+    if (!XAI_API_KEY) throw new Error("XAI_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -198,8 +196,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action: string = typeof body.action === "string" ? body.action : "freeform";
     const question: string = typeof body.question === "string" ? body.question : "";
-    const requestedModel: string = typeof body.model === "string" ? body.model : "google/gemini-2.5-pro";
-    const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : "google/gemini-2.5-pro";
+    const requestedModel: string = typeof body.model === "string" ? body.model : "grok-4.3";
+    const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : "grok-4.3";
 
     if (action === "freeform" && !question.trim()) {
       return new Response(JSON.stringify({ error: "Question is required for freeform analysis." }), {
@@ -224,10 +222,10 @@ Deno.serve(async (req) => {
         ? `User question: ${question}\n\nDATA CONTEXT (JSON):\n${JSON.stringify(context)}`
         : `Quick action: ${action}\n${question ? `Additional note: ${question}\n` : ""}\nDATA CONTEXT (JSON):\n${JSON.stringify(context)}`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${XAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -253,8 +251,8 @@ Deno.serve(async (req) => {
         );
       }
       const t = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error", details: t }), {
+      console.error("xAI API error", aiRes.status, t);
+      return new Response(JSON.stringify({ error: "xAI API error", details: t }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

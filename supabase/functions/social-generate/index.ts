@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY')!
 
 const PLATFORM_LABELS: Record<string, string> = {
   google_business: 'Google Business Profile',
@@ -43,8 +43,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    const useModel = (typeof model === 'string' && model) ? model : 'google/gemini-2.5-flash'
-    const useProvider = (typeof provider === 'string' && provider) ? provider : 'lovable'
+    const useModel = (typeof model === 'string' && model) ? model : 'grok-4.3'
+    const useProvider = (typeof provider === 'string' && provider) ? provider : 'xai'
 
     // Load active strategy
     const { data: strategy } = await supabase
@@ -79,11 +79,11 @@ ${platformList}
 
 ${seedText ? `Seed / starting notes from Eric:\n${seedText}\n\n` : ''}Generate the post copy now. Return only the copy blocks — no preamble, no closing remarks.`
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: useModel,
@@ -103,7 +103,7 @@ ${seedText ? `Seed / starting notes from Eric:\n${seedText}\n\n` : ''}Generate t
       })
     }
     if (aiRes.status === 402) {
-      return new Response(JSON.stringify({ error: 'AI credits exhausted. Add credits in Lovable AI Gateway.' }), {
+      return new Response(JSON.stringify({ error: 'AI credits exhausted. Add credits in xAI workspace settings.' }), {
         status: 402,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

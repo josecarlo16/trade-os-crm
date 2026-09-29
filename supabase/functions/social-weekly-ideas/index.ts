@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     const { data, error } = await supabase.functions.invoke('social-suggest-ideas', {
-      body: { provider: 'lovable', model: 'google/gemini-2.5-flash', count: 5, useJobData: true },
+      body: { provider: 'xai', model: 'grok-4.3', count: 5, useJobData: true },
     })
     if (error) throw error
     if (data?.error) throw new Error(data.error)
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       format: i.format,
       source_context: i.source_context,
       status: 'suggested',
-      ai_model: data?.model || 'google/gemini-2.5-flash',
+      ai_model: data?.model || 'grok-4.3',
     }))
 
     if (rows.length > 0) {

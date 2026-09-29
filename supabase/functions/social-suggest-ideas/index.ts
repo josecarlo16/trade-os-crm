@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!
+const XAI_API_KEY = Deno.env.get('XAI_API_KEY')!
 
 const PLATFORM_LABELS: Record<string, string> = {
   google_business: 'Google Business Profile',
@@ -31,8 +31,8 @@ export async function generateIdeas(opts: {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   const started = Date.now()
 
-  const useModel = opts.model || 'google/gemini-2.5-flash'
-  const useProvider = opts.provider || 'lovable'
+  const useModel = opts.model || 'grok-4.3'
+  const useProvider = opts.provider || 'xai'
   const count = Math.max(1, Math.min(10, opts.count ?? 5))
   const platforms = (opts.platforms && opts.platforms.length > 0) ? opts.platforms : ALL_PLATFORMS
   const useJobData = opts.useJobData !== false
@@ -146,9 +146,9 @@ Return the JSON array only.`
     aiBody.max_tokens = 2200
     aiBody.temperature = 0.9
   }
-  const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+  const aiRes = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LOVABLE_API_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${XAI_API_KEY}` },
     body: JSON.stringify(aiBody),
   })
 
@@ -156,7 +156,7 @@ Return the JSON array only.`
     return { ok: false, status: 429, error: 'Rate limit reached. Try again shortly.' }
   }
   if (aiRes.status === 402) {
-    return { ok: false, status: 402, error: 'AI credits exhausted. Add credits in Lovable AI Gateway.' }
+    return { ok: false, status: 402, error: 'AI credits exhausted. Add credits in xAI workspace settings.' }
   }
   if (!aiRes.ok) {
     const t = await aiRes.text()

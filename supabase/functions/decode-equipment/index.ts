@@ -30,9 +30,9 @@ serve(async (req) => {
       zipCode 
     });
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
+    if (!XAI_API_KEY) {
+      console.error('XAI_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,14 +68,14 @@ Return ONLY a valid JSON object with these fields:
 If you cannot read a value clearly, return null for that field.
 Return ONLY the JSON object, no additional text.`;
 
-      const visionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const visionResponse = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': `Bearer ${XAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: 'grok-4.3',
           messages: [
             {
               role: 'user',
@@ -164,15 +164,15 @@ IMPORTANT:
 - Voltage info format: Voltage/Phase/Frequency (e.g., 208-230V/1PH/60Hz)
 - Return ONLY the JSON object, no additional text`;
 
-    // Call the Lovable AI Gateway for decoding
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call xAI for decoding
+    const aiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'grok-4.3',
         messages: [
           { role: 'user', content: decodePrompt }
         ],
@@ -223,7 +223,7 @@ IMPORTANT:
         );
       }
       const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', status, errorText);
+      console.error('xAI API error:', status, errorText);
       return new Response(
         JSON.stringify({ error: 'Failed to decode equipment' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
