@@ -83,6 +83,7 @@ const AdminSEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
 const AdminSEOEditor = lazy(() => import("./pages/admin/SEOEditor"));
 const AdminSEOPerformance = lazy(() => import("./pages/admin/SEOPerformance"));
 const AdminSEOUpload = lazy(() => import("./pages/admin/SEOUpload"));
+const AdminLocationPageBuilder = lazy(() => import("./pages/admin/LocationPageBuilder"));
 const AdminCalculators = lazy(() => import("./pages/admin/Calculators"));
 const AdminCalculatorEditor = lazy(() => import("./pages/admin/CalculatorEditor"));
 const AdminLandingPageForms = lazy(() => import("./pages/admin/LandingPageForms"));
@@ -196,11 +197,14 @@ const router = createBrowserRouter([
       { path: "/admin/seo", element: <ProtectedRoute><AdminSEOManagement /></ProtectedRoute> },
       { path: "/admin/seo-performance", element: <ProtectedRoute><AdminSEOPerformance /></ProtectedRoute> },
       { path: "/admin/seo/upload", element: <ProtectedRoute><AdminSEOUpload /></ProtectedRoute> },
+      { path: "/admin/seo/location/:id", element: <ProtectedRoute><AdminLocationPageBuilder /></ProtectedRoute> },
       { path: "/admin/seo/:id", element: <ProtectedRoute><AdminSEOEditor /></ProtectedRoute> },
       { path: "/admin/calculators", element: <ProtectedRoute><AdminCalculators /></ProtectedRoute> },
       { path: "/admin/calculators/:id", element: <ProtectedRoute><AdminCalculatorEditor /></ProtectedRoute> },
       { path: "/admin/landing-pages", element: <ProtectedRoute><AdminLandingPageForms /></ProtectedRoute> },
       { path: "/admin/landing-pages/new", element: <ProtectedRoute><AdminLandingPageFormEditor /></ProtectedRoute> },
+      { path: "/admin/landing-pages/submissions", element: <ProtectedRoute><AdminUnifiedSubmissions /></ProtectedRoute> },
+      { path: "/admin/ducted-submissions", element: <Navigate to="/admin/submissions" replace /> },
       { path: "/admin/landing-pages/:id", element: <ProtectedRoute><AdminLandingPageFormEditor /></ProtectedRoute> },
       { path: "/admin/scanner-analytics", element: <ProtectedRoute><AdminScannerAnalytics /></ProtectedRoute> },
       { path: "/admin/button-clicks", element: <ProtectedRoute><AdminButtonClicks /></ProtectedRoute> },

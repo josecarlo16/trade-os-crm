@@ -327,8 +327,10 @@ const CustomerDetail = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left column: contact info + related customers */}
+          <div className="space-y-6 lg:col-span-1">
           {/* Customer Info Card */}
-          <Card className="lg:col-span-1">
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">Contact Information</CardTitle>
             </CardHeader>
@@ -408,6 +410,7 @@ const CustomerDetail = () => {
           </Card>
 
           <CustomerRelationships customerId={customer.id} />
+          </div>
 
           {/* Main Content */}
           <div className="lg:col-span-2">

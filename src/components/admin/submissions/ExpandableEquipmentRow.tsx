@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight, Eye, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -69,7 +68,9 @@ export const ExpandableEquipmentRow = ({
   };
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+    // Fragment (not Collapsible): Collapsible renders a <div>, which is invalid inside <tbody>
+    // and breaks column alignment with the table header.
+    <Fragment>
       <TableRow
         className="cursor-pointer hover:bg-muted/50"
         onClick={(e) => {
@@ -88,15 +89,21 @@ export const ExpandableEquipmentRow = ({
         <TableCell>
           <div className="flex items-center gap-2">
             {hasMultipleUnits && (
-              <CollapsibleTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
             )}
             <Badge className={sourceColors[submission.source]} variant="secondary">
               {sourceLabels[submission.source]}
@@ -157,8 +164,8 @@ export const ExpandableEquipmentRow = ({
       </TableRow>
       
       {/* Expanded Equipment Details */}
-      {hasMultipleUnits && (
-        <CollapsibleContent asChild>
+      {hasMultipleUnits && isExpanded && (
+        <>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableCell colSpan={6} className="p-0">
               <div className="px-4 py-3 border-l-4 border-orange-400 ml-4">
@@ -219,8 +226,8 @@ export const ExpandableEquipmentRow = ({
               </div>
             </TableCell>
           </TableRow>
-        </CollapsibleContent>
+        </>
       )}
-    </Collapsible>
+    </Fragment>
   );
 };
